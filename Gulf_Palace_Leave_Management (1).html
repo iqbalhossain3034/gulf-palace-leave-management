@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Gulf Palace — Dammam | Leave Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+:root{
+  --navy:#0E2439;
+  --navy-light:#16324B;
+  --navy-lighter:#1F4562;
+  --gold:#C9A24B;
+  --gold-light:#E4C77E;
+  --gold-dim: rgba(201,162,75,.35);
+  --cream:#FAF7F1;
+  --white:#FFFFFF;
+  --ink:#1D2733;
+  --slate:#5B6B7A;
+  --slate-light:#8A97A3;
+  --border:#E7E2D6;
+  --border-soft:#F0ECE1;
+  --success:#2F7A52;
+  --success-bg:#E7F3EC;
+  --warning:#A8781F;
+  --warning-bg:#FBF1DF;
+  --danger:#B4432E;
+  --danger-bg:#FBEAE5;
+  --info:#2B6E8C;
+  --info-bg:#E7F2F7;
+  --radius:12px;
+  --radius-sm:8px;
+  --shadow: 0 1px 2px rgba(14,36,57,.06), 0 8px 24px -12px rgba(14,36,57,.18);
+  --shadow-lg: 0 20px 48px -16px rgba(14,36,57,.35);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'Inter',-apple-system,'Noto Sans Bengali',sans-serif;
+  background:var(--cream);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+.bn{font-family:'Noto Sans Bengali','Inter',sans-serif;}
+.ar{font-family:'Noto Naskh Arabic',sans-serif; direction:rtl;}
+h1,h2,h3,.display{font-family:'Playfair Display',serif;}
+::selection{background:var(--gold-dim);}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+a{color:inherit;}
+
+/* ---------- scrollbar ---------- */
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#D8D1BF; border-radius:10px;}
+
+/* ---------- Login ---------- */
+#loginScreen{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(201,162,75,.10), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(31,69,98,.5), transparent 60%),
+    var(--navy);
+  padding:24px;
+}
+.login-card{
+  width:100%; max-width:420px; background:var(--white); border-radius:20px;
+  box-shadow:var(--shadow-lg); padding:44px 38px 36px; position:relative; overflow:hidden;
+}
+.login-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:6px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-light),var(--gold));
+}
+.brand-mark{
+  width:64px; height:64px; border-radius:50%; margin:0 auto 18px; display:flex;
+  align-items:center; justify-content:center; background:var(--navy);
+  border:2px solid var(--gold); color:var(--gold-light);
+  font-family:'Playfair Display',serif; font-size:22px; font-weight:700; letter-spacing:1px;
+}
+.login-card h1{ text-align:center; font-size:22px; color:var(--navy); margin-bottom:4px;}
+.login-sub{ text-align:center; color:var(--slate); font-size:13.5px; margin-bottom:28px;}
+.field{ margin-bottom:16px; }
+.field label{ display:block; font-size:12.5px; font-weight:600; color:var(--slate); margin-bottom:6px; letter-spacing:.2px;}
+.field input, .field select, .field textarea{
+  width:100%; padding:11px 13px; border:1.5px solid var(--border); border-radius:10px;
+  font-size:14.5px; color:var(--ink); background:var(--cream); transition:.15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus{
+  outline:none; border-color:var(--gold); background:var(--white); box-shadow:0 0 0 3px var(--gold-dim);
+}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:11px 18px; border-radius:10px; border:none; font-weight:600; font-size:14px;
+  transition:.15s; white-space:nowrap;
+}
+.btn-primary{ background:var(--navy); color:var(--gold-light); }
+.btn-primary:hover{ background:var(--navy-light); }
+.btn-gold{ background:linear-gradient(180deg,var(--gold-light),var(--gold)); color:var(--navy); font-weight:700;}
+.btn-gold:hover{ filter:brightness(1.05); }
+.btn-outline{ background:transparent; border:1.5px solid var(--border); color:var(--ink); }
+.btn-outline:hover{ border-color:var(--navy); }
+.btn-ghost{ background:transparent; color:var(--slate); }
+.btn-ghost:hover{ color:var(--navy); background:var(--border-soft); }
+.btn-danger{ background:var(--danger-bg); color:var(--danger); }
+.btn-danger:hover{ background:#f6d9d1; }
+.btn-block{ width:100%; }
+.btn-sm{ padding:7px 12px; font-size:12.5px; border-radius:8px; }
+.login-error{
+  background:var(--danger-bg); color:var(--danger); font-size:13px; padding:10px 12px;
+  border-radius:8px; margin-bottom:14px; display:none;
+}
+.login-foot{ text-align:center; margin-top:20px; font-size:12px; color:var(--slate-light); }
+
+/* ---------- App shell ---------- */
+#app{ display:none; min-height:100vh; }
+.shell{ display:grid; grid-template-columns:250px 1fr; min-height:100vh; }
+.sidebar{
+  background:var(--navy); color:#DCE6EE; padding:22px 16px; display:flex; flex-direction:column;
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.side-brand{ display:flex; align-items:center; gap:11px; padding:6px 8px 22px; border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:14px;}
+.side-brand .mark{
+  width:38px; height:38px; border-radius:50%; background:rgba(201,162,75,.15); border:1.5px solid var(--gold);
+  color:var(--gold-light); display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-weight:700; font-size:14px; flex:none;
+}
+.side-brand .txt strong{ display:block; font-size:13.5px; letter-spacing:.3px; color:#fff; font-family:'Playfair Display',serif;}
+.side-brand .txt span{ font-size:10.5px; color:var(--gold-light); letter-spacing:1.5px; text-transform:uppercase;}
+.nav-group-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:1.2px; color:#6E8399; margin:16px 10px 8px;}
+.nav-item{
+  display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:9px; font-size:13.6px;
+  color:#B9C8D6; font-weight:500; margin-bottom:2px; transition:.12s; cursor:pointer; user-select:none;
+}
+.nav-item svg{ width:17px; height:17px; flex:none; opacity:.85; }
+.nav-item:hover{ background:rgba(255,255,255,.06); color:#fff; }
+.nav-item.active{ background:linear-gradient(90deg, rgba(201,162,75,.22), rgba(201,162,75,.06)); color:#fff; box-shadow:inset 3px 0 0 var(--gold);}
+.side-foot{ margin-top:auto; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
+.side-user{ display:flex; align-items:center; gap:9px; padding:8px; font-size:12.5px; color:#B9C8D6; }
+.side-user .dot{ width:8px; height:8px; border-radius:50%; background:#4CC48A; flex:none; }
+body.role-staff .admin-only{ display:none !important; }
+.my-leave-card{ display:flex; align-items:center; gap:16px; padding:20px; }
+.my-leave-card .ring{ width:76px; height:76px; }
+.my-leave-card .ring span{ font-size:16px; }
+.logout-link{ font-size:12px; color:#8FA2B4; margin-top:8px; display:inline-block; padding:4px 8px;}
+.logout-link:hover{ color:#fff; }
+
+.main{ padding:26px 34px 60px; max-width:1360px; }
+.topbar{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px;}
+.topbar h2{ font-size:24px; color:var(--navy); }
+.topbar .sub{ color:var(--slate); font-size:13px; margin-top:3px; }
+.divider-motif{ height:2px; width:64px; margin-top:8px; background:linear-gradient(90deg,var(--gold),transparent); border-radius:2px;}
+
+.grid{ display:grid; gap:18px; }
+.grid-4{ grid-template-columns:repeat(4,1fr); }
+.grid-3{ grid-template-columns:repeat(3,1fr); }
+.grid-2{ grid-template-columns:repeat(2,1fr); }
+@media (max-width:1180px){ .grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:760px){ .grid-4,.grid-3,.grid-2{grid-template-columns:1fr;} .shell{grid-template-columns:1fr;} .sidebar{position:relative; height:auto;} }
+
+.card{ background:var(--white); border:1px solid var(--border-soft); border-radius:var(--radius); box-shadow:var(--shadow); }
+.card-pad{ padding:20px 22px; }
+.stat-card{ padding:18px 20px; position:relative; overflow:hidden;}
+.stat-card .lbl{ font-size:11.5px; text-transform:uppercase; letter-spacing:.8px; color:var(--slate); font-weight:700;}
+.stat-card .val{ font-family:'Playfair Display',serif; font-size:30px; color:var(--navy); margin-top:6px;}
+.stat-card .cap{ font-size:12px; color:var(--slate-light); margin-top:4px;}
+.stat-card .ic{ position:absolute; right:14px; top:14px; width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+.stat-card .ic svg{ width:18px; height:18px; }
+
+.section-title{ font-size:16px; color:var(--navy); font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+.section-title .tag{ background:var(--gold-dim); color:var(--warning); font-size:10.5px; padding:2px 8px; border-radius:20px; font-weight:700; letter-spacing:.3px; }
+
+table{ width:100%; border-collapse:collapse; font-size:13.3px; }
+th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate); font-weight:700; padding:10px 12px; border-bottom:1.5px solid var(--border); white-space:nowrap;}
+td{ padding:11px 12px; border-bottom:1px solid var(--border-soft); color:var(--ink); vertical-align:middle;}
+tr:hover td{ background:#FBFAF6; }
+.tbl-wrap{ overflow-x:auto; }
+
+.badge{ display:inline-flex; align-items:center; gap:5px; padding:3.5px 10px; border-radius:20px; font-size:11.2px; font-weight:700; letter-spacing:.2px; white-space:nowrap;}
+.badge-success{ background:var(--success-bg); color:var(--success); }
+.badge-warning{ background:var(--warning-bg); color:var(--warning); }
+.badge-danger{ background:var(--danger-bg); color:var(--danger); }
+.badge-info{ background:var(--info-bg); color:var(--info); }
+.badge-neutral{ background:#EEEBE1; color:var(--slate); }
+
+.ring{ width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; position:relative; flex:none;}
+.ring span{ font-size:11px; font-weight:800; color:var(--navy); }
+
+.staff-card{ padding:18px; display:flex; flex-direction:column; gap:12px; }
+.staff-top{ display:flex; align-items:center; gap:12px; }
+.avatar{ width:44px; height:44px; border-radius:12px; background:var(--navy); color:var(--gold-light); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Playfair Display',serif; flex:none;}
+.staff-name{ font-weight:700; color:var(--navy); font-size:14.5px; }
+.staff-role{ font-size:12px; color:var(--slate); }
+.staff-meta{ display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; color:var(--slate); }
+.staff-meta b{ color:var(--ink); font-weight:600; }
+.staff-actions{ display:flex; gap:8px; margin-top:4px; flex-wrap:wrap; }
+
+.toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+.search-box{ position:relative; flex:1; min-width:220px; }
+.search-box input{ width:100%; padding:10px 12px 10px 36px; border:1.5px solid var(--border); border-radius:10px; font-size:13.5px; background:var(--white);}
+.search-box input:focus{ outline:none; border-color:var(--gold); }
+.search-box svg{ position:absolute; left:11px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--slate-light);}
+.select-pill{ padding:9px 12px; border-radius:10px; border:1.5px solid var(--border); background:var(--white); font-size:13px; color:var(--ink); }
+
+.empty{ text-align:center; padding:50px 20px; color:var(--slate); }
+.empty svg{ width:40px; height:40px; color:var(--border); margin-bottom:10px; }
+.empty b{ display:block; color:var(--navy); font-size:14.5px; margin-bottom:4px; }
+
+/* ---------- modal ---------- */
+.overlay{ position:fixed; inset:0; background:rgba(14,24,36,.55); backdrop-filter:blur(2px); display:none; align-items:flex-start; justify-content:center; z-index:100; padding:40px 16px; overflow-y:auto;}
+.overlay.show{ display:flex; }
+.modal{ background:var(--white); width:100%; max-width:560px; border-radius:16px; box-shadow:var(--shadow-lg); overflow:hidden; margin-bottom:40px;}
+.modal.wide{ max-width:760px; }
+.modal-head{ padding:20px 24px; border-bottom:1px solid var(--border-soft); display:flex; align-items:center; justify-content:space-between; }
+.modal-head h3{ font-size:17px; color:var(--navy); }
+.modal-close{ width:30px; height:30px; border-radius:8px; border:none; background:var(--border-soft); color:var(--slate); font-size:16px; display:flex; align-items:center; justify-content:center;}
+.modal-close:hover{ background:var(--danger-bg); color:var(--danger); }
+.modal-body{ padding:22px 24px; max-height:70vh; overflow-y:auto; }
+.modal-foot{ padding:16px 24px; border-top:1px solid var(--border-soft); display:flex; justify-content:flex-end; gap:10px; }
+.form-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.form-row.c3{ grid-template-columns:1fr 1fr 1fr; }
+@media (max-width:560px){ .form-row,.form-row.c3{grid-template-columns:1fr;} }
+.hint{ font-size:11.5px; color:var(--slate-light); margin-top:4px; }
+
+/* ---------- toast ---------- */
+#toastWrap{ position:fixed; bottom:22px; right:22px; z-index:300; display:flex; flex-direction:column; gap:10px; }
+.toast{ background:var(--navy); color:#fff; padding:12px 18px; border-radius:10px; font-size:13.5px; box-shadow:var(--shadow-lg); display:flex; align-items:center; gap:10px; min-width:240px; animation:slideIn .25s ease; }
+.toast.err{ background:var(--danger); }
+.toast.ok{ background:var(--success); }
+@keyframes slideIn{ from{ transform:translateX(20px); opacity:0;} to{ transform:translateX(0); opacity:1;} }
+
+/* ---------- misc ---------- */
+.tabs{ display:flex; gap:4px; border-bottom:1.5px solid var(--border); margin-bottom:20px; flex-wrap:wrap; }
+.tab-btn{ padding:10px 16px; font-size:13.3px; font-weight:600; color:var(--slate); border-bottom:2.5px solid transparent; margin-bottom:-1.5px; background:transparent; border-radius:0;}
+.tab-btn.active{ color:var(--navy); border-color:var(--gold); }
+.pill-row{ display:flex; gap:8px; flex-wrap:wrap; }
+.k-v{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+.k-v span:first-child{ color:var(--slate); }
+.k-v span:last-child{ font-weight:600; color:var(--ink); }
+.note-box{ background:var(--info-bg); color:var(--info); border-radius:10px; padding:12px 14px; font-size:12.8px; line-height:1.55; }
+.warn-box{ background:var(--warning-bg); color:var(--warning); border-radius:10px; padding:12px 14px; font-size:12.8px; line-height:1.55; }
+.loading-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; color:var(--slate); background:var(--cream); }
+.spinner{ width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--gold); animation:spin .8s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg);} }
+
+/* Print form */
+.print-only{ display:none; }
+@media print{
+  body *{ visibility:hidden; }
+  #printArea, #printArea *{ visibility:visible; }
+  #printArea{ position:absolute; top:0; left:0; width:100%; padding:20px; }
+}
+#printArea{ display:none; }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOADING ===================== -->
+<div id="loadingScreen" class="loading-screen">
+  <div class="spinner"></div>
+  <div>লোড হচ্ছে…</div>
+</div>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen" style="display:none;">
+  <div class="login-card">
+    <div class="brand-mark">GP</div>
+    <h1>The Gulf Palace — Dammam</h1>
+    <div class="login-sub bn">Leave &amp; Vacation Management System</div>
+    <div id="loginError" class="login-error"></div>
+    <div class="field">
+      <label class="bn">TC নম্বর <span style="font-weight:400; color:var(--slate-light);">(যেমন 3034)</span></label>
+      <input type="text" id="loginTc" placeholder="3034" autocomplete="username" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-gold btn-block" onclick="doLogin()">Sign In</button>
+    <div class="login-foot bn">প্রতিটি স্টাফ তার নিজের TC নম্বর দিয়ে লগইন করবে। Admin অ্যাক্সেসের জন্যও একই পদ্ধতি প্রযোজ্য।</div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="side-brand">
+      <div class="mark">GP</div>
+      <div class="txt">
+        <strong>Gulf Palace</strong>
+        <span>Leave System</span>
+      </div>
+    </div>
+
+    <div class="nav-group-label">Overview</div>
+    <div class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+      <span id="navDashboardLabel">Dashboard</span>
+    </div>
+
+    <div class="nav-group-label admin-only">Staff</div>
+    <div class="nav-item admin-only" data-view="staff" onclick="showView('staff')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.5-4 5-5.5 7-5.5S17.5 16 19 20"/></svg>
+      Staff Directory
+    </div>
+    <div class="nav-item admin-only" data-view="contracts" onclick="showView('contracts')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      Contracts
+    </div>
+
+    <div class="nav-group-label">Leave</div>
+    <div class="nav-item admin-only" data-view="leave" onclick="showView('leave')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      Leave Records
+    </div>
+    <div class="nav-item admin-only" data-view="approvals" onclick="showView('approvals')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><rect x="3" y="5" width="18" height="16" rx="2"/></svg>
+      Approvals <span id="pendingCountBadge" class="badge badge-danger" style="display:none; margin-left:4px;">0</span>
+    </div>
+    <div class="nav-item admin-only" data-view="localLeave" onclick="showView('localLeave')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3v6l4 2"/><circle cx="12" cy="12" r="9"/></svg>
+      Saudi Local Leave
+    </div>
+    <div class="nav-item admin-only" data-view="tickets" onclick="showView('tickets')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 10l18-6-6 18-3-7-7-3z"/></svg>
+      Air Tickets
+    </div>
+
+    <div class="nav-group-label admin-only">Tools</div>
+    <div class="nav-item admin-only" data-view="indemnity" onclick="showView('indemnity')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+      Indemnity Calc.
+    </div>
+    <div class="nav-item admin-only" data-view="settings" onclick="showView('settings')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Settings
+    </div>
+
+    <div class="side-foot">
+      <div class="side-user"><span class="dot"></span> <span id="sideUserEmail">—</span></div>
+      <div style="font-size:11px; color:var(--gold-light); margin-top:2px;" id="sideUserRole"></div>
+      <a class="logout-link" onclick="doLogout()">সাইন আউট করুন →</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ================= DASHBOARD ================= -->
+    <section id="view-dashboard" class="view">
+      <div class="topbar">
+        <div>
+          <h2 id="dashTitle">ড্যাশবোর্ড</h2>
+          <div class="sub" id="dashSub">Laundry Department · The Gulf Palace, Dammam</div>
+          <div class="divider-motif"></div>
+        </div>
+        <button class="btn btn-gold admin-only" onclick="openLeaveModal()">+ নতুন লিভ এন্ট্রি</button>
+        <button class="btn btn-gold staff-only" style="display:none;" onclick="openStaffRequestModal()">+ লিভের জন্য আবেদন করুন</button>
+      </div>
+
+      <!-- ===== STAFF PERSONAL SUMMARY (staff role only) ===== -->
+      <div id="staffHomeBox" class="staff-only" style="display:none;">
+        <div class="grid grid-2" style="margin-bottom:18px;">
+          <div class="card my-leave-card">
+            <div class="ring" id="myBalanceRing"><span id="myBalanceVal">—</span></div>
+            <div>
+              <div class="lbl" style="font-size:11.5px; text-transform:uppercase; color:var(--slate); font-weight:700;">Annual Leave Balance</div>
+              <div style="font-size:13px; color:var(--slate); margin-top:4px;" id="myBalanceSub">—</div>
+            </div>
+          </div>
+          <div class="card my-leave-card">
+            <div class="ring" id="myTicketRing"><span id="myTicketVal">—</span></div>
+            <div>
+              <div class="lbl" style="font-size:11.5px; text-transform:uppercase; color:var(--slate); font-weight:700;">Next Air Ticket</div>
+              <div style="font-size:13px; color:var(--slate); margin-top:4px;" id="myTicketSub">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">আমার লিভ হিস্ট্রি</div>
+          <div class="tbl-wrap">
+          <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
+          <tbody id="myLeaveTbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ADMIN STATS (admin role only) ===== -->
+      <div class="admin-only">
+      <div class="grid grid-4" style="margin-bottom:22px;">
+        <div class="card stat-card">
+          <div class="ic" style="background:var(--info-bg); color:var(--info);"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.5-4 5-5.5 7-5.5S17.5 16 19 20"/></svg></div>
+          <div class="lbl">Total Staff</div>
+          <div class="val" id="statTotalStaff">0</div>
+          <div class="cap" id="statActiveStaff">0 active</div>
+        </div>
+        <div class="card stat-card">
+          <div class="ic" style="background:var(--success-bg); color:var(--success);"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg></div>
+          <div class="lbl">On Leave Now</div>
+          <div class="val" id="statOnLeave">0</div>
+          <div class="cap">currently away</div>
+        </div>
+        <div class="card stat-card">
+          <div class="ic" style="background:var(--warning-bg); color:var(--warning);"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 10l18-6-6 18-3-7-7-3z"/></svg></div>
+          <div class="lbl">Ticket Due</div>
+          <div class="val" id="statTicketDue">0</div>
+          <div class="cap">staff eligible now</div>
+        </div>
+        <div class="card stat-card">
+          <div class="ic" style="background:var(--danger-bg); color:var(--danger);"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
+          <div class="lbl">Contract Expiring</div>
+          <div class="val" id="statContractExp">0</div>
+          <div class="cap">within 60 days</div>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card card-pad">
+          <div class="section-title">স্টাফ লিভ ব্যালেন্স</div>
+          <div id="dashBalanceList"></div>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">সাম্প্রতিক লিভ কার্যক্রম</div>
+          <div id="dashRecentActivity"></div>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <!-- ================= APPROVALS (admin only) ================= -->
+    <section id="view-approvals" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>লিভ অনুমোদন</h2><div class="sub">স্টাফদের পাঠানো লিভ রিকোয়েস্ট অনুমোদন/বাতিল করুন</div><div class="divider-motif"></div></div>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>TC No</th><th>Name</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Remark</th><th>Action</th></tr></thead>
+          <tbody id="approvalsTbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STAFF ================= -->
+    <section id="view-staff" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>স্টাফ ডিরেক্টরি</h2><div class="sub">সকল কর্মীর প্রোফাইল ও লিভ ব্যালেন্স</div><div class="divider-motif"></div></div>
+        <button class="btn btn-gold" onclick="openStaffModal()">+ নতুন স্টাফ যোগ করুন</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="staffSearch" oninput="renderStaffGrid()" placeholder="নাম বা TC নম্বর দিয়ে খুঁজুন…">
+        </div>
+        <select class="select-pill" id="staffStatusFilter" onchange="renderStaffGrid()">
+          <option value="">সব স্ট্যাটাস</option>
+          <option value="Active">Active</option>
+          <option value="On Leave">On Leave</option>
+          <option value="Resigned">Resigned</option>
+        </select>
+      </div>
+      <div class="grid grid-3" id="staffGrid"></div>
+    </section>
+
+    <!-- ================= CONTRACTS ================= -->
+    <section id="view-contracts" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>কন্ট্রাক্ট বিবরণ</h2><div class="sub">Contract period, balance ও renewal status</div><div class="divider-motif"></div></div>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>TC No</th><th>Name</th><th>Position</th><th>Contract Period</th><th>Balance Leave</th><th>Ticket Due</th><th>Completed</th><th>Status</th></tr></thead>
+          <tbody id="contractsTbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LEAVE RECORDS ================= -->
+    <section id="view-leave" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>লিভ রেকর্ডস</h2><div class="sub">Reservation → On Leave → Closed workflow</div><div class="divider-motif"></div></div>
+        <button class="btn btn-gold" onclick="openLeaveModal()">+ নতুন লিভ এন্ট্রি</button>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="all" onclick="setLeaveTab('all')">সব</button>
+        <button class="tab-btn" data-tab="Pending" onclick="setLeaveTab('Pending')">Pending</button>
+        <button class="tab-btn" data-tab="Reserved" onclick="setLeaveTab('Reserved')">Reserved</button>
+        <button class="tab-btn" data-tab="On Leave" onclick="setLeaveTab('On Leave')">On Leave</button>
+        <button class="tab-btn" data-tab="Closed" onclick="setLeaveTab('Closed')">Closed</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="নাম বা TC দিয়ে খুঁজুন…">
+        </div>
+        <select class="select-pill" id="leaveTypeFilter" onchange="renderLeaveTable()">
+          <option value="">সব ধরন</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>TC No</th><th>Name</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Ticket</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="leaveTbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LOCAL LEAVE ================= -->
+    <section id="view-localLeave" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>সৌদি লোকাল লিভ ক্যালেন্ডার</h2><div class="sub">Ramadan, Hajj, National Day, Foundation Day — অটোমেটিক প্রয়োগ</div><div class="divider-motif"></div></div>
+        <select class="select-pill" id="localLeaveYear" onchange="loadLocalLeaveYear()"></select>
+      </div>
+      <div class="note-box" style="margin-bottom:18px;">
+        প্রতি বছর Ramadan ও Hajj-এর তারিখ হিজরি ক্যালেন্ডার অনুযায়ী পরিবর্তিত হয় — তাই এই দুটো নিজে বসাতে হবে। National Day (২৩ সেপ্টেম্বর) ও Foundation Day (২২ ফেব্রুয়ারি) প্রতি বছর ফিক্সড, তাই ডিফল্ট বসানো আছে। তারিখ ঠিক করে "সব Active স্টাফে প্রয়োগ করুন" চাপুন — প্রতিটি স্টাফের জন্য স্বয়ংক্রিয়ভাবে লিভ রেকর্ড তৈরি হবে।
+      </div>
+      <div class="grid grid-2">
+        <div class="card card-pad">
+          <div class="section-title">🌙 Ramadan Leave</div>
+          <div class="form-row">
+            <div class="field"><label>From</label><input type="date" id="ll_ramadan_from"></div>
+            <div class="field"><label>To</label><input type="date" id="ll_ramadan_to"></div>
+          </div>
+          <div class="hint" id="ll_ramadan_days">Days: —</div>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Ramadan Leave','ll_ramadan_from','ll_ramadan_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">🕋 Hajj Leave</div>
+          <div class="form-row">
+            <div class="field"><label>From</label><input type="date" id="ll_hajj_from"></div>
+            <div class="field"><label>To</label><input type="date" id="ll_hajj_to"></div>
+          </div>
+          <div class="hint" id="ll_hajj_days">Days: —</div>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Hajj Leave','ll_hajj_from','ll_hajj_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">🇸🇦 National Day</div>
+          <div class="form-row">
+            <div class="field"><label>From</label><input type="date" id="ll_national_from"></div>
+            <div class="field"><label>To</label><input type="date" id="ll_national_to"></div>
+          </div>
+          <div class="hint" id="ll_national_days">Days: —</div>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('National Day','ll_national_from','ll_national_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">🏛️ Foundation Day</div>
+          <div class="form-row">
+            <div class="field"><label>From</label><input type="date" id="ll_foundation_from"></div>
+            <div class="field"><label>To</label><input type="date" id="ll_foundation_to"></div>
+          </div>
+          <div class="hint" id="ll_foundation_days">Days: —</div>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Foundation Day','ll_foundation_from','ll_foundation_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+        </div>
+      </div>
+
+      <div class="card card-pad" style="margin-top:18px;">
+        <div class="section-title">এই বছরের প্রয়োগ ইতিহাস</div>
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th></tr></thead>
+          <tbody id="localLeaveHistoryTbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= AIR TICKETS ================= -->
+    <section id="view-tickets" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>এয়ার টিকেট ট্র্যাকার</h2><div class="sub">প্রতি ২ বছর পর পর Up-Down টিকেট এন্টাইটেলমেন্ট</div><div class="divider-motif"></div></div>
+      </div>
+      <div class="grid grid-3" id="ticketCards"></div>
+    </section>
+
+    <!-- ================= INDEMNITY ================= -->
+    <section id="view-indemnity" class="view" style="display:none;">
+      <div class="topbar"><div><h2>ইনডেমনিটি ক্যালকুলেটর</h2><div class="sub">End of Service Benefit হিসাব (Saudi Labor Law অনুসারে)</div><div class="divider-motif"></div></div></div>
+      <div class="grid grid-2">
+        <div class="card card-pad">
+          <div class="section-title">ইনপুট</div>
+          <div class="field"><label>স্টাফ বেছে নিন</label>
+            <select id="indStaffSelect" onchange="fillIndemnityFromStaff()"><option value="">— manual entry —</option></select>
+          </div>
+          <div class="form-row">
+            <div class="field"><label>Joining Date</label><input type="date" id="indJoining"></div>
+            <div class="field"><label>Current / Leaving Date</label><input type="date" id="indCurrent"></div>
+          </div>
+          <div class="form-row c3">
+            <div class="field"><label>Basic Salary</label><input type="number" id="indSalary" value="0"></div>
+            <div class="field"><label>Food Allowance</label><input type="number" id="indFood" value="0"></div>
+            <div class="field"><label>House Allowance</label><input type="number" id="indHouse" value="0"></div>
+          </div>
+          <div class="field"><label>Unpaid Leave Days (deduct)</label><input type="number" id="indUnpaid" value="0"></div>
+          <div class="field"><label>Termination Type</label>
+            <select id="indType">
+              <option value="full">Resigned after 10+ years / Terminated by employer (100%)</option>
+              <option value="two_third">Resigned 5–10 years service (2/3)</option>
+              <option value="one_third">Resigned 2–5 years service (1/3)</option>
+            </select>
+          </div>
+          <button class="btn btn-gold btn-block" onclick="calcIndemnity()">হিসাব করুন</button>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">ফলাফল</div>
+          <div id="indemnityResult">
+            <div class="empty"><b>এখনও হিসাব করা হয়নি</b>বাম পাশের ফর্ম পূরণ করে "হিসাব করুন" চাপুন</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section id="view-settings" class="view" style="display:none;">
+      <div class="topbar"><div><h2>সেটিংস</h2><div class="sub">লিভ পলিসি ও সিস্টেম কনফিগারেশন</div><div class="divider-motif"></div></div></div>
+      <div class="grid grid-2">
+        <div class="card card-pad">
+          <div class="section-title">Annual Leave Accrual Policy</div>
+          <div class="form-row">
+            <div class="field"><label>প্রথম ৫ বছর (দিন/বছর)</label><input type="number" id="cfgRateBefore"></div>
+            <div class="field"><label>৫ বছর পর (দিন/বছর)</label><input type="number" id="cfgRateAfter"></div>
+          </div>
+          <div class="field"><label>Ticket Cycle (বছর)</label><input type="number" id="cfgTicketCycle"></div>
+          <button class="btn btn-primary" onclick="saveConfig()">সংরক্ষণ করুন</button>
+        </div>
+        <div class="card card-pad">
+          <div class="section-title">অ্যাকাউন্ট</div>
+          <div class="k-v"><span>Signed in as</span><span id="cfgUserEmail">—</span></div>
+          <div class="k-v"><span>Firebase Project</span><span id="cfgProjectId">—</span></div>
+          <div class="k-v"><span>Total Staff</span><span id="cfgStaffCount">0</span></div>
+          <div class="k-v"><span>Total Leave Records</span><span id="cfgLeaveCount">0</span></div>
+          <div class="warn-box" style="margin-top:14px;">এই অ্যাপ ব্যবহার করার আগে নিচের firebaseConfig অংশে আপনার নিজের Firebase প্রজেক্টের credentials বসিয়ে নিন, এবং Firestore-এ একটি Admin ইউজার তৈরি করুন (Firebase Console → Authentication)।</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+</div>
+
+<!-- ===================== MODAL: STAFF ===================== -->
+<div class="overlay" id="staffModalOverlay">
+  <div class="modal wide">
+    <div class="modal-head"><h3 id="staffModalTitle">নতুন স্টাফ যোগ করুন</h3><button class="modal-close" onclick="closeModal('staffModalOverlay')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="staffDocId">
+      <div class="form-row c3">
+        <div class="field"><label>TC No *</label><input id="s_tcNo" placeholder="যেমন 3050"></div>
+        <div class="field"><label>Name *</label><input id="s_name" placeholder="Full name"></div>
+        <div class="field"><label>Position *</label><input id="s_position" placeholder="যেমন Laundry man"></div>
+      </div>
+      <div class="form-row c3">
+        <div class="field"><label>Nationality</label><input id="s_nationality" placeholder="যেমন Bgl"></div>
+        <div class="field"><label>Department</label><input id="s_department" value="Laundry"></div>
+        <div class="field"><label>Status</label>
+          <select id="s_status"><option>Active</option><option>On Leave</option><option>Resigned</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>App Role</label>
+          <select id="s_role"><option value="staff">Staff (নিজের তথ্য দেখতে ও রিকোয়েস্ট পাঠাতে পারবে)</option><option value="admin">Admin (সব কিছু ম্যানেজ করতে পারবে)</option></select>
+        </div>
+      </div>
+      <div class="card card-pad" style="background:var(--cream); margin:4px 0 18px;" id="s_loginBox">
+        <div class="section-title" style="margin-bottom:8px;">🔐 App Login</div>
+        <div id="s_loginStatus" class="note-box" style="margin-bottom:10px;">Username হবে স্টাফের TC নম্বর (উদাহরণ: TC 3034 → Username <b>3034</b>)।</div>
+        <div class="form-row">
+          <div class="field"><label>Password <span class="hint">(কমপক্ষে ৬ ক্যারেক্টার)</span></label><input type="text" id="s_newPassword" placeholder="যেমন Iqbal1722"></div>
+          <div class="field" style="display:flex; align-items:flex-end;"><button type="button" class="btn btn-outline btn-block" id="s_createLoginBtn" onclick="handleCreateStaffLogin()">লগইন তৈরি করুন</button></div>
+        </div>
+        <div class="hint">যদি "email already in use" এরর দেখান তাহলে এই TC-এর লগইন আগে থেকেই আছে — পরিবর্তন করতে Firebase Console → Authentication → Users থেকে আগেরটা Delete করে আবার তৈরি করুন।</div>
+      </div>
+      <div class="form-row c3">
+        <div class="field"><label>Joining Date *</label><input type="date" id="s_joining"></div>
+        <div class="field"><label>Contract Start</label><input type="date" id="s_contractStart"></div>
+        <div class="field"><label>Contract End</label><input type="date" id="s_contractEnd"></div>
+      </div>
+      <div class="form-row c3">
+        <div class="field"><label>Basic Salary</label><input type="number" id="s_salary" value="0"></div>
+        <div class="field"><label>Food Allowance</label><input type="number" id="s_food" value="0"></div>
+        <div class="field"><label>House Allowance</label><input type="number" id="s_house" value="0"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Passport Expiry</label><input type="date" id="s_passport"></div>
+        <div class="field"><label>Last Air Ticket Date <span class="hint">(টিকেট সাইকেল হিসাবের ভিত্তি)</span></label><input type="date" id="s_lastTicket"></div>
+      </div>
+      <div class="field"><label>Remarks</label><textarea id="s_remark" rows="2"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('staffModalOverlay')">বাতিল</button>
+      <button class="btn btn-gold" onclick="saveStaff()">সংরক্ষণ করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: LEAVE ===================== -->
+<div class="overlay" id="leaveModalOverlay">
+  <div class="modal wide">
+    <div class="modal-head"><h3 id="leaveModalTitle">নতুন লিভ এন্ট্রি</h3><button class="modal-close" onclick="closeModal('leaveModalOverlay')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="field"><label>স্টাফ বেছে নিন *</label>
+          <select id="lv_tcNo" onchange="refreshLeaveModalBalance()"><option value="">— বেছে নিন —</option></select>
+        </div>
+        <div class="field"><label>Leave Type *</label>
+          <select id="lv_type">
+            <option>Annual</option><option>Local</option><option>Emergency</option>
+            <option>Ramadan Leave</option><option>Hajj Leave</option><option>National Day</option>
+            <option>Foundation Day</option><option>Marriage Leave</option><option>Unpaid Leave</option><option>Study Leave</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row c3">
+        <div class="field"><label>From *</label><input type="date" id="lv_from" onchange="calcLeaveDays()"></div>
+        <div class="field"><label>To *</label><input type="date" id="lv_to" onchange="calcLeaveDays()"></div>
+        <div class="field"><label>Total Days</label><input type="number" id="lv_days" readonly style="background:#F0ECE1;"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Ticket Type</label>
+          <select id="lv_ticket"><option value="None">None</option><option value="Company Ticket">Company Ticket</option><option value="Self Ticket">Self Ticket</option></select>
+        </div>
+        <div class="field" id="lv_statusRow"><label>Status</label>
+          <select id="lv_status"><option value="Reserved">Reserved (ভবিষ্যতের জন্য বুক করা)</option><option value="On Leave">On Leave (এখনই যাচ্ছে)</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Remark</label><input id="lv_remark" placeholder="যেমন Dammam to Dhaka"></div>
+      <div class="note-box" id="lv_balanceNote">একজন স্টাফ বেছে নিন — ব্যালেন্স দেখানো হবে</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('leaveModalOverlay')">বাতিল</button>
+      <button class="btn btn-gold" onclick="saveLeave()">সংরক্ষণ করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: STAFF DETAIL ===================== -->
+<div class="overlay" id="detailModalOverlay">
+  <div class="modal wide">
+    <div class="modal-head"><h3 id="detailModalTitle">স্টাফ বিবরণ</h3><button class="modal-close" onclick="closeModal('detailModalOverlay')">✕</button></div>
+    <div class="modal-body" id="detailModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="printLeaveForm()">🖨️ Leave Request প্রিন্ট করুন</button>
+      <button class="btn btn-ghost" onclick="closeModal('detailModalOverlay')">বন্ধ করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: CLOSE LEAVE (return) ===================== -->
+<div class="overlay" id="closeModalOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3>লিভ ক্লোজ করুন (Return)</h3><button class="modal-close" onclick="closeModal('closeModalOverlay')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="cl_leaveId">
+      <div id="cl_summary" class="note-box" style="margin-bottom:16px;"></div>
+      <div class="field"><label>প্রকৃত রিটার্ন তারিখ *</label><input type="date" id="cl_returnDate"></div>
+      <div class="field" id="cl_ticketUsedWrap" style="display:none;">
+        <label><input type="checkbox" id="cl_ticketUsed" checked> এয়ার টিকেট ব্যবহার হয়েছে — টিকেট সাইকেল রিসেট করুন</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('closeModalOverlay')">বাতিল</button>
+      <button class="btn btn-gold" onclick="confirmCloseLeave()">লিভ ক্লোজ করুন</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap"></div>
+
+<!-- Print template -->
+<div id="printArea">
+  <div style="text-align:center; font-family:'Playfair Display',serif;">
+    <h2>The Gulf Palace — Dammam</h2>
+    <div class="ar" style="font-size:15px;">قصـــــر الخليج - الدمـــام</div>
+    <h3 style="margin-top:6px;">LEAVE REQUEST / طـلب إجازة</h3>
+  </div>
+  <div id="printBody" style="margin-top:20px; font-size:13px; line-height:1.8;"></div>
+</div>
+
+<script>
+/* =========================================================================
+   FIREBASE CONFIG
+   ------------------------------------------------------------------------
+   এখানে আপনার নিজের Firebase প্রজেক্টের কনফিগারেশন বসান।
+   Firebase Console → Project settings → General → Your apps → SDK setup
+   Firestore ও Authentication (Email/Password) চালু রাখতে হবে।
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDI1zX3hDRTRbs8Hls7OxP6U0_Le_IEbQw",
+  authDomain: "monthly-report-app-1866a.firebaseapp.com",
+  projectId: "monthly-report-app-1866a",
+  storageBucket: "monthly-report-app-1866a.firebasestorage.app",
+  messagingSenderId: "703092180506",
+  appId: "1:703092180506:web:d0b07485e77aff1752b3a3",
+  measurementId: "G-FZDFY172R4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+// secondary app instance — lets an Admin create a new staff login (Firebase Auth account)
+// WITHOUT signing themselves out (a well-known client-side Firebase trick).
+const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
+
+/* =========================================================================
+   CONSTANTS & STATE
+   ========================================================================= */
+const MS_DAY = 86400000;
+const LOGIN_DOMAIN = "gulfpalace.local"; // TC number "3034" -> internal login email "3034@gulfpalace.local"
+let CFG = { rateBeforeFive: 21, rateAfterFive: 30, fiveYearDays: 1825, ticketCycleYears: 2 };
+
+let staffList = [];      // cached from Firestore
+let leaveList = [];      // cached from Firestore
+let currentLeaveTab = 'all';
+let unsubStaff = null, unsubLeave = null, unsubConfig = null;
+let currentUser = null;  // { tcNo, name, role } — resolved once staffList loads after login
+let roleApplied = false;
+
+const SEED_STAFF = [
+  { tcNo:"3034", name:"Iqbal Hossain", position:"Laundry Supervisor", nationality:"Bgl", department:"Laundry", status:"Active", role:"admin",
+    joiningDate:"2002-08-07", contractStart:"2024-08-07", contractEnd:"2026-08-07",
+    salary:2930, food:500, house:488.33, passportExpiry:"2027-03-20", lastTicket:"2024-08-07", remark:"" },
+  { tcNo:"3042", name:"Abdel Moaz Ibrhim Elradi", position:"Valet", nationality:"Sud", department:"Laundry", status:"Active", role:"staff",
+    joiningDate:"2015-10-22", contractStart:"2025-10-22", contractEnd:"2027-10-22",
+    salary:2334, food:0, house:0, passportExpiry:"2023-02-12", lastTicket:"2025-10-22", remark:"" },
+  { tcNo:"3045", name:"Moshiur Rahman", position:"Laundry man", nationality:"Bgl", department:"Laundry", status:"Active", role:"staff",
+    joiningDate:"2018-10-07", contractStart:"2024-10-07", contractEnd:"2026-10-07",
+    salary:1894, food:0, house:0, passportExpiry:"2024-05-18", lastTicket:"2024-10-07", remark:"" },
+  { tcNo:"3048", name:"Abdullah Mohammed Jasem Al Amiri", position:"Washerman", nationality:"Sud", department:"Laundry", status:"Active", role:"staff",
+    joiningDate:"2024-09-17", contractStart:"2024-09-17", contractEnd:"2026-09-17",
+    salary:1284, food:0, house:0, passportExpiry:"2027-06-17", lastTicket:"2024-09-17", remark:"" }
+];
+
+/* =========================================================================
+   AUTH
+   ========================================================================= */
+auth.onAuthStateChanged(user=>{
+  if(user){
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('loadingScreen').style.display='flex';
+    document.getElementById('loadingScreen').querySelector('div:last-child').textContent = 'প্রোফাইল লোড হচ্ছে…';
+    roleApplied = false;
+    initListeners();
+  } else {
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('app').style.display='none';
+    document.getElementById('loginScreen').style.display='flex';
+    currentUser = null;
+  }
+});
+
+function tcToLoginEmail(tcNo){ return tcNo.trim() + "@" + LOGIN_DOMAIN; }
+
+function doLogin(){
+  const tcNo = document.getElementById('loginTc').value.trim();
+  const pass = document.getElementById('loginPassword').value;
+  const errBox = document.getElementById('loginError');
+  errBox.style.display='none';
+  if(!tcNo || !pass){ errBox.textContent='TC নম্বর ও পাসওয়ার্ড দিন'; errBox.style.display='block'; return; }
+  auth.signInWithEmailAndPassword(tcToLoginEmail(tcNo), pass).catch(err=>{
+    let msg = 'লগইন ব্যর্থ';
+    if(err.code==='auth/user-not-found' || err.code==='auth/invalid-credential') msg='এই TC নম্বরের কোনো লগইন পাওয়া যায়নি। Admin-কে বলুন আপনার জন্য অ্যাকাউন্ট তৈরি করে দিতে।';
+    else if(err.code==='auth/wrong-password') msg='পাসওয়ার্ড ভুল হয়েছে';
+    else msg = 'লগইন ব্যর্থ: ' + (err.message||err.code);
+    errBox.textContent = msg;
+    errBox.style.display='block';
+  });
+}
+function doLogout(){ auth.signOut(); }
+document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+/* Resolve the logged-in user's staff record + role, and lock down the UI accordingly. */
+function resolveCurrentUser(){
+  const user = auth.currentUser;
+  if(!user) return;
+  const tcNo = user.email.split('@')[0];
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  currentUser = s ? { tcNo: s.tcNo, name: s.name, role: s.role||'staff' } : { tcNo, name: user.email, role:'admin' }; // fallback: unknown login (e.g. legacy email) treated as admin
+  applyRoleUI();
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+}
+
+function applyRoleUI(){
+  if(!currentUser) return;
+  const isAdmin = currentUser.role === 'admin';
+  document.body.classList.toggle('role-staff', !isAdmin);
+  document.querySelectorAll('.admin-only').forEach(el=> el.style.display = isAdmin ? '' : 'none');
+  document.querySelectorAll('.staff-only').forEach(el=> el.style.display = isAdmin ? 'none' : '');
+  document.getElementById('sideUserEmail').textContent = currentUser.name;
+  document.getElementById('sideUserRole').textContent = isAdmin ? 'Administrator' : 'Staff · TC ' + currentUser.tcNo;
+  document.getElementById('cfgUserEmail').textContent = auth.currentUser.email;
+  document.getElementById('cfgProjectId').textContent = firebaseConfig.projectId;
+  document.getElementById('navDashboardLabel').textContent = isAdmin ? 'Dashboard' : 'আমার লিভ';
+  if(!roleApplied){ showView('dashboard'); } // only force-navigate right after login, not on every data refresh
+  roleApplied = true;
+}
+
+/* Create a brand-new staff login (Firebase Auth account) using the secondary app instance
+   so the currently signed-in Admin is never signed out in the process. */
+async function createStaffLogin(tcNo, password){
+  const email = tcToLoginEmail(tcNo);
+  try{
+    await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+    await secondaryApp.auth().signOut();
+    return { ok:true };
+  }catch(err){
+    return { ok:false, error: err.message||err.code };
+  }
+}
+
+/* =========================================================================
+   FIRESTORE LISTENERS
+   ========================================================================= */
+function initListeners(){
+  if(unsubStaff) unsubStaff();
+  if(unsubLeave) unsubLeave();
+  if(unsubConfig) unsubConfig();
+
+  unsubStaff = db.collection('staff').orderBy('tcNo').onSnapshot(snap=>{
+    staffList = snap.docs.map(d=>({ id:d.id, role:'staff', ...d.data() }));
+    if(staffList.length===0){ seedInitialStaff(); }
+    resolveCurrentUser();
+    refreshAll();
+  }, err=> toast('Staff লোড ব্যর্থ: '+err.message, 'err'));
+
+  unsubLeave = db.collection('leaves').orderBy('fromDate','desc').onSnapshot(snap=>{
+    leaveList = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    refreshAll();
+  }, err=> toast('Leave লোড ব্যর্থ: '+err.message, 'err'));
+
+  unsubConfig = db.collection('settings').doc('appConfig').onSnapshot(doc=>{
+    if(doc.exists){
+      CFG = Object.assign(CFG, doc.data());
+    } else {
+      db.collection('settings').doc('appConfig').set(CFG);
+    }
+    document.getElementById('cfgRateBefore').value = CFG.rateBeforeFive;
+    document.getElementById('cfgRateAfter').value = CFG.rateAfterFive;
+    document.getElementById('cfgTicketCycle').value = CFG.ticketCycleYears;
+    refreshAll();
+  });
+}
+
+async function seedInitialStaff(){
+  const batch = db.batch();
+  SEED_STAFF.forEach(s=>{
+    const ref = db.collection('staff').doc(s.tcNo);
+    batch.set(ref, {
+      tcNo:s.tcNo, name:s.name, position:s.position, nationality:s.nationality,
+      department:s.department, status:s.status, role:s.role||'staff', joiningDate:s.joiningDate,
+      contractStart:s.contractStart, contractEnd:s.contractEnd,
+      salary:s.salary, food:s.food, house:s.house,
+      passportExpiry:s.passportExpiry, lastTicket:s.lastTicket, remark:s.remark,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  });
+  await batch.commit();
+  toast('প্রাথমিক ৪ জন স্টাফের ডেটা যোগ করা হয়েছে', 'ok');
+}
+
+function refreshAll(){
+  if(!currentUser) return; // wait until role is resolved before rendering anything
+  renderDashboard();
+  renderMyLeaveHome();
+  renderStaffGrid();
+  renderContracts();
+  renderLeaveTable();
+  renderApprovals();
+  renderTicketCards();
+  renderStaffSelects();
+  populateYearSelector();
+  document.getElementById('cfgStaffCount').textContent = staffList.length;
+  document.getElementById('cfgLeaveCount').textContent = leaveList.length;
+}
+
+/* =========================================================================
+   NAVIGATION
+   ========================================================================= */
+const ADMIN_ONLY_VIEWS = ['staff','contracts','approvals','localLeave','tickets','indemnity','settings'];
+function showView(name){
+  if(currentUser && currentUser.role!=='admin' && ADMIN_ONLY_VIEWS.includes(name)) name = 'dashboard';
+  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+  document.getElementById('view-'+name).style.display='block';
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const navEl = document.querySelector('.nav-item[data-view="'+name+'"]');
+  if(navEl) navEl.classList.add('active');
+}
+
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function openModalEl(id){ document.getElementById(id).classList.add('show'); }
+
+function toast(msg, type){
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type==='err'?'err':type==='ok'?'ok':'');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(20px)'; setTimeout(()=>el.remove(),250); }, 3200);
+}
+
+/* =========================================================================
+   BUSINESS LOGIC — LEAVE ACCRUAL / BALANCE / TICKETS
+   ========================================================================= */
+function daysBetween(a,b){ return Math.round((new Date(b) - new Date(a)) / MS_DAY); }
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+// Accrued annual leave since joining, per Saudi labour law style tiered rate
+function accruedAnnualLeave(joiningDate, asOf){
+  const tenureDays = Math.max(0, daysBetween(joiningDate, asOf || todayISO()));
+  const perDayBefore = CFG.rateBeforeFive/365;
+  const perDayAfter = CFG.rateAfterFive/365;
+  if(tenureDays <= CFG.fiveYearDays){
+    return tenureDays * perDayBefore;
+  }
+  return CFG.fiveYearDays*perDayBefore + (tenureDays - CFG.fiveYearDays)*perDayAfter;
+}
+
+function annualLeaveTakenDays(tcNo){
+  return leaveList
+    .filter(l=> l.tcNo===tcNo && l.type==='Annual' && l.status!=='Cancelled')
+    .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
+}
+
+function leaveBalance(staff){
+  const accrued = accruedAnnualLeave(staff.joiningDate);
+  const taken = annualLeaveTakenDays(staff.tcNo);
+  return { accrued, taken, balance: accrued - taken };
+}
+
+function tenureYearsMonthsDays(joiningDate){
+  const start = new Date(joiningDate), end = new Date();
+  let y = end.getFullYear()-start.getFullYear();
+  let m = end.getMonth()-start.getMonth();
+  let d = end.getDate()-start.getDate();
+  if(d<0){ m--; d += new Date(end.getFullYear(), end.getMonth(),0).getDate(); }
+  if(m<0){ y--; m+=12; }
+  return {y,m,d};
+}
+
+function ticketInfo(staff){
+  const cycleDays = CFG.ticketCycleYears*365;
+  const base = staff.lastTicket || staff.joiningDate;
+  const nextDue = new Date(new Date(base).getTime() + cycleDays*MS_DAY);
+  const daysLeft = daysBetween(todayISO(), nextDue.toISOString().slice(0,10));
+  return { base, nextDue: nextDue.toISOString().slice(0,10), daysLeft, due: daysLeft<=0 };
+}
+
+function activeLeaveFor(tcNo){
+  return leaveList.find(l=> l.tcNo===tcNo && (l.status==='On Leave' || l.status==='Reserved'));
+}
+
+/* =========================================================================
+   DASHBOARD
+   ========================================================================= */
+function renderDashboard(){
+  if(currentUser.role!=='admin') return; // staff sees the personalized box (renderMyLeaveHome) instead
+  const active = staffList.filter(s=>s.status!=='Resigned');
+  document.getElementById('statTotalStaff').textContent = staffList.length;
+  document.getElementById('statActiveStaff').textContent = active.length + ' active';
+  document.getElementById('statOnLeave').textContent = leaveList.filter(l=>l.status==='On Leave').length;
+
+  const ticketDue = staffList.filter(s=>s.status!=='Resigned' && ticketInfo(s).due).length;
+  document.getElementById('statTicketDue').textContent = ticketDue;
+
+  const expiring = staffList.filter(s=>{
+    if(!s.contractEnd || s.status==='Resigned') return false;
+    const dl = daysBetween(todayISO(), s.contractEnd);
+    return dl>=0 && dl<=60;
+  }).length;
+  document.getElementById('statContractExp').textContent = expiring;
+
+  // balance list
+  const balBox = document.getElementById('dashBalanceList');
+  if(staffList.length===0){
+    balBox.innerHTML = '<div class="empty"><b>কোনো স্টাফ নেই</b>Staff Directory থেকে যোগ করুন</div>';
+  } else {
+    balBox.innerHTML = staffList.filter(s=>s.status!=='Resigned').map(s=>{
+      const b = leaveBalance(s);
+      const pct = Math.max(0, Math.min(100, (b.balance/(b.accrued||1))*100));
+      const color = b.balance<10 ? 'var(--danger)' : b.balance<30 ? 'var(--warning)' : 'var(--success)';
+      return `<div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-soft);">
+        <div class="ring" style="background:conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg);"><span>${b.balance.toFixed(0)}</span></div>
+        <div style="flex:1;">
+          <div class="staff-name" style="font-size:13.5px;">${s.name}</div>
+          <div class="staff-role">TC ${s.tcNo} · ${s.position}</div>
+        </div>
+        <div style="text-align:right; font-size:12px; color:var(--slate);">Accrued ${b.accrued.toFixed(1)}<br>Taken ${b.taken.toFixed(0)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // recent activity
+  const actBox = document.getElementById('dashRecentActivity');
+  const recent = [...leaveList].sort((a,b)=> (b.requestedAt?.seconds||0) - (a.requestedAt?.seconds||0)).slice(0,8);
+  if(recent.length===0){
+    actBox.innerHTML = '<div class="empty"><b>কোনো কার্যক্রম নেই</b>নতুন লিভ এন্ট্রি করুন</div>';
+  } else {
+    actBox.innerHTML = recent.map(l=>`
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border-soft); font-size:13px;">
+        <div><b>${l.name}</b><span style="color:var(--slate);"> · ${l.type}</span></div>
+        <div>${statusBadge(l.status)}</div>
+      </div>`).join('');
+  }
+}
+
+function statusBadge(status){
+  const map = { 'Pending':'badge-warning', 'Reserved':'badge-info', 'On Leave':'badge-warning', 'Closed':'badge-success', 'Cancelled':'badge-neutral', 'Rejected':'badge-danger' };
+  return `<span class="badge ${map[status]||'badge-neutral'}">${status}</span>`;
+}
+
+/* =========================================================================
+   STAFF SELF-SERVICE: MY DASHBOARD, MY REQUESTS, APPROVALS
+   ========================================================================= */
+function renderMyLeaveHome(){
+  if(!currentUser || currentUser.role==='admin') return;
+  const s = staffList.find(x=>x.tcNo===currentUser.tcNo);
+  if(!s) return;
+  document.getElementById('dashTitle').textContent = 'আসসালামু আলাইকুম, ' + s.name.split(' ')[0];
+  document.getElementById('dashSub').textContent = s.position + ' · TC ' + s.tcNo + ' · ' + s.department;
+
+  const b = leaveBalance(s);
+  const pct = Math.max(0, Math.min(100, (b.balance/(b.accrued||1))*100));
+  const color = b.balance<10 ? 'var(--danger)' : b.balance<30 ? 'var(--warning)' : 'var(--success)';
+  document.getElementById('myBalanceRing').style.background = `conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg)`;
+  document.getElementById('myBalanceVal').textContent = b.balance.toFixed(0);
+  document.getElementById('myBalanceSub').textContent = `Accrued ${b.accrued.toFixed(1)} · Taken ${b.taken.toFixed(0)} দিন`;
+
+  const ti = ticketInfo(s);
+  const tpct = Math.max(0, Math.min(100, 100-(ti.daysLeft/(CFG.ticketCycleYears*365))*100));
+  const tcolor = ti.due?'var(--danger)': ti.daysLeft<90?'var(--warning)':'var(--success)';
+  document.getElementById('myTicketRing').style.background = `conic-gradient(${tcolor} ${tpct*3.6}deg, var(--border-soft) 0deg)`;
+  document.getElementById('myTicketVal').textContent = ti.due?'DUE':ti.daysLeft+'d';
+  document.getElementById('myTicketSub').textContent = ti.due ? 'আপনার টিকেট এখনই প্রাপ্য' : 'পরবর্তী: ' + fmtDate(ti.nextDue);
+
+  const hist = leaveList.filter(l=>l.tcNo===currentUser.tcNo).sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
+  const tbody = document.getElementById('myLeaveTbody');
+  tbody.innerHTML = hist.length ? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center; color:var(--slate); padding:24px;">এখনো কোনো লিভ রেকর্ড নেই</td></tr>';
+}
+
+function openStaffRequestModal(){
+  if(!currentUser) return;
+  document.getElementById('lv_tcNo').value = currentUser.tcNo;
+  document.getElementById('lv_type').value='Annual';
+  document.getElementById('lv_from').value='';
+  document.getElementById('lv_to').value='';
+  document.getElementById('lv_days').value='';
+  document.getElementById('lv_ticket').value='None';
+  document.getElementById('lv_remark').value='';
+  refreshLeaveModalBalance();
+  // lock the staff selector and status field for self-service requests
+  document.getElementById('lv_tcNo').disabled = true;
+  document.getElementById('lv_statusRow').style.display='none';
+  document.getElementById('leaveModalTitle').textContent = 'লিভের জন্য আবেদন করুন';
+  openModalEl('leaveModalOverlay');
+}
+
+function renderApprovals(){
+  if(!currentUser || currentUser.role!=='admin') return;
+  const pending = leaveList.filter(l=>l.status==='Pending').sort((a,b)=> new Date(a.fromDate)-new Date(b.fromDate));
+  const badge = document.getElementById('pendingCountBadge');
+  if(pending.length>0){ badge.textContent = pending.length; badge.style.display='inline-flex'; } else { badge.style.display='none'; }
+
+  const tbody = document.getElementById('approvalsTbody');
+  if(pending.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">কোনো Pending রিকোয়েস্ট নেই</td></tr>'; return; }
+  tbody.innerHTML = pending.map(l=>`<tr>
+    <td>${l.tcNo}</td><td>${l.name}</td><td>${l.type}</td>
+    <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
+    <td>${l.remark||'—'}</td>
+    <td><button class="btn btn-gold btn-sm" onclick="approveLeave('${l.id}')">Approve</button> <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button></td>
+  </tr>`).join('');
+}
+
+async function approveLeave(id){
+  try{ await db.collection('leaves').doc(id).update({ status:'Reserved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('অনুমোদন করা হয়েছে','ok'); }
+  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+}
+async function rejectLeave(id){
+  if(!confirm('এই লিভ রিকোয়েস্ট বাতিল করবেন?')) return;
+  try{ await db.collection('leaves').doc(id).update({ status:'Rejected' }); toast('বাতিল করা হয়েছে','ok'); }
+  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+}
+
+/* =========================================================================
+   STAFF DIRECTORY
+   ========================================================================= */
+function renderStaffGrid(){
+  const q = (document.getElementById('staffSearch')?.value||'').toLowerCase();
+  const statusF = document.getElementById('staffStatusFilter')?.value||'';
+  let list = staffList.filter(s=> (s.name.toLowerCase().includes(q) || s.tcNo.includes(q)) );
+  if(statusF) list = list.filter(s=>s.status===statusF);
+
+  const grid = document.getElementById('staffGrid');
+  if(list.length===0){
+    grid.innerHTML = '<div class="card empty" style="grid-column:1/-1;"><b>কোনো স্টাফ পাওয়া যায়নি</b>খোঁজ পরিবর্তন করুন বা নতুন স্টাফ যোগ করুন</div>';
+    return;
+  }
+  grid.innerHTML = list.map(s=>{
+    const b = leaveBalance(s);
+    const ti = ticketInfo(s);
+    const initials = s.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    const activeLv = activeLeaveFor(s.tcNo);
+    return `<div class="card staff-card">
+      <div class="staff-top">
+        <div class="avatar">${initials}</div>
+        <div style="flex:1;">
+          <div class="staff-name">${s.name}</div>
+          <div class="staff-role">${s.position} · TC ${s.tcNo}</div>
+        </div>
+        ${statusBadge(activeLv? activeLv.status : (s.status==='Resigned'?'Cancelled':'Closed')).replace(activeLv?activeLv.status:(s.status==='Resigned'?'Cancelled':'Closed'), s.status)}
+      </div>
+      <div class="staff-meta">
+        <div>Balance <b>${b.balance.toFixed(1)}</b> days</div>
+        <div>Nationality <b>${s.nationality||'—'}</b></div>
+        <div>Ticket ${ti.due? '<span style="color:var(--danger); font-weight:700;">Due now</span>' : '<b>'+fmtDate(ti.nextDue)+'</b>'}</div>
+      </div>
+      <div class="staff-actions">
+        <button class="btn btn-outline btn-sm" onclick="openStaffDetail('${s.tcNo}')">বিস্তারিত</button>
+        <button class="btn btn-outline btn-sm" onclick="openStaffModal('${s.tcNo}')">সম্পাদনা</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStaff('${s.tcNo}')">মুছুন</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openStaffModal(tcNo){
+  document.getElementById('staffModalTitle').textContent = tcNo? 'স্টাফ সম্পাদনা করুন' : 'নতুন স্টাফ যোগ করুন';
+  document.getElementById('staffDocId').value = tcNo||'';
+  const s = tcNo? staffList.find(x=>x.tcNo===tcNo) : null;
+  document.getElementById('s_tcNo').value = s?.tcNo||'';
+  document.getElementById('s_tcNo').disabled = !!tcNo;
+  document.getElementById('s_name').value = s?.name||'';
+  document.getElementById('s_position').value = s?.position||'';
+  document.getElementById('s_nationality').value = s?.nationality||'';
+  document.getElementById('s_department').value = s?.department||'Laundry';
+  document.getElementById('s_status').value = s?.status||'Active';
+  document.getElementById('s_joining').value = s?.joiningDate||'';
+  document.getElementById('s_contractStart').value = s?.contractStart||'';
+  document.getElementById('s_contractEnd').value = s?.contractEnd||'';
+  document.getElementById('s_salary').value = s?.salary||0;
+  document.getElementById('s_food').value = s?.food||0;
+  document.getElementById('s_house').value = s?.house||0;
+  document.getElementById('s_passport').value = s?.passportExpiry||'';
+  document.getElementById('s_lastTicket').value = s?.lastTicket||s?.joiningDate||'';
+  document.getElementById('s_remark').value = s?.remark||'';
+  document.getElementById('s_role').value = s?.role||'staff';
+  document.getElementById('s_newPassword').value = '';
+  document.getElementById('s_loginStatus').innerHTML = 'Username হবে স্টাফের TC নম্বর (উদাহরণ: TC 3034 → Username <b>3034</b>)।';
+  openModalEl('staffModalOverlay');
+}
+
+async function handleCreateStaffLogin(){
+  const tcNo = document.getElementById('s_tcNo').value.trim();
+  const pass = document.getElementById('s_newPassword').value;
+  const statusBox = document.getElementById('s_loginStatus');
+  if(!tcNo){ toast('আগে TC No দিন', 'err'); return; }
+  if(!pass || pass.length<6){ toast('কমপক্ষে ৬ ক্যারেক্টারের পাসওয়ার্ড দিন', 'err'); return; }
+  const btn = document.getElementById('s_createLoginBtn');
+  btn.disabled = true; btn.textContent = 'তৈরি হচ্ছে…';
+  const result = await createStaffLogin(tcNo, pass);
+  btn.disabled = false; btn.textContent = 'লগইন তৈরি করুন';
+  if(result.ok){
+    statusBox.innerHTML = `✅ লগইন তৈরি হয়েছে — Username: <b>${tcNo}</b>, Password যা দিয়েছেন সেটাই।`;
+    toast('স্টাফ লগইন তৈরি করা হয়েছে', 'ok');
+    document.getElementById('s_newPassword').value='';
+  } else {
+    if((result.error||'').toLowerCase().includes('email-already-in-use') || (result.error||'').toLowerCase().includes('already')){
+      statusBox.innerHTML = `⚠️ TC <b>${tcNo}</b>-এর জন্য লগইন আগে থেকেই আছে। পরিবর্তন করতে Firebase Console → Authentication → Users থেকে আগেরটা Delete করুন।`;
+    } else {
+      statusBox.innerHTML = `❌ ব্যর্থ: ${result.error}`;
+    }
+    toast('লগইন তৈরি ব্যর্থ', 'err');
+  }
+}
+
+async function saveStaff(){
+  const tcNo = document.getElementById('s_tcNo').value.trim();
+  const name = document.getElementById('s_name').value.trim();
+  const position = document.getElementById('s_position').value.trim();
+  const joining = document.getElementById('s_joining').value;
+  if(!tcNo || !name || !position || !joining){ toast('TC No, Name, Position, Joining Date আবশ্যক', 'err'); return; }
+
+  const data = {
+    tcNo, name, position,
+    nationality: document.getElementById('s_nationality').value.trim(),
+    department: document.getElementById('s_department').value.trim() || 'Laundry',
+    status: document.getElementById('s_status').value,
+    role: document.getElementById('s_role').value,
+    joiningDate: joining,
+    contractStart: document.getElementById('s_contractStart').value,
+    contractEnd: document.getElementById('s_contractEnd').value,
+    salary: Number(document.getElementById('s_salary').value)||0,
+    food: Number(document.getElementById('s_food').value)||0,
+    house: Number(document.getElementById('s_house').value)||0,
+    passportExpiry: document.getElementById('s_passport').value,
+    lastTicket: document.getElementById('s_lastTicket').value || joining,
+    remark: document.getElementById('s_remark').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    await db.collection('staff').doc(tcNo).set(data, {merge:true});
+    toast('স্টাফ সংরক্ষণ করা হয়েছে', 'ok');
+    closeModal('staffModalOverlay');
+    document.getElementById('s_tcNo').disabled = false;
+  }catch(err){ toast('সংরক্ষণ ব্যর্থ: '+err.message, 'err'); }
+}
+
+async function deleteStaff(tcNo){
+  if(!confirm('এই স্টাফের সব তথ্য মুছে ফেলা হবে। নিশ্চিত?')) return;
+  try{ await db.collection('staff').doc(tcNo).delete(); toast('স্টাফ মুছে ফেলা হয়েছে','ok'); }
+  catch(err){ toast('মুছতে ব্যর্থ: '+err.message,'err'); }
+}
+
+function openStaffDetail(tcNo){
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  if(!s) return;
+  const b = leaveBalance(s);
+  const ti = ticketInfo(s);
+  const tenure = tenureYearsMonthsDays(s.joiningDate);
+  const hist = leaveList.filter(l=>l.tcNo===tcNo).sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
+
+  document.getElementById('detailModalTitle').textContent = s.name + ' — TC ' + s.tcNo;
+  document.getElementById('detailModalBody').innerHTML = `
+    <div class="grid grid-2" style="margin-bottom:18px;">
+      <div>
+        <div class="k-v"><span>Position</span><span>${s.position}</span></div>
+        <div class="k-v"><span>Nationality</span><span>${s.nationality||'—'}</span></div>
+        <div class="k-v"><span>Joining Date</span><span>${fmtDate(s.joiningDate)}</span></div>
+        <div class="k-v"><span>Tenure</span><span>${tenure.y}y ${tenure.m}m ${tenure.d}d</span></div>
+        <div class="k-v"><span>Contract Period</span><span>${fmtDate(s.contractStart)} → ${fmtDate(s.contractEnd)}</span></div>
+        <div class="k-v"><span>Passport Expiry</span><span>${fmtDate(s.passportExpiry)}</span></div>
+      </div>
+      <div>
+        <div class="k-v"><span>Accrued Annual Leave</span><span>${b.accrued.toFixed(2)} days</span></div>
+        <div class="k-v"><span>Taken</span><span>${b.taken.toFixed(0)} days</span></div>
+        <div class="k-v"><span>Balance</span><span style="color:${b.balance<10?'var(--danger)':'var(--success)'}; font-weight:800;">${b.balance.toFixed(2)} days</span></div>
+        <div class="k-v"><span>Last Air Ticket</span><span>${fmtDate(ti.base)}</span></div>
+        <div class="k-v"><span>Next Ticket Due</span><span>${ti.due?'<b style="color:var(--danger)">Due Now</b>':fmtDate(ti.nextDue)}</span></div>
+        <div class="k-v"><span>Salary (Basic+Food+House)</span><span>${(s.salary+s.food+s.house).toFixed(0)} SAR</span></div>
+      </div>
+    </div>
+    <div class="section-title">লিভ ইতিহাস (${hist.length})</div>
+    <div class="tbl-wrap" style="max-height:260px; overflow-y:auto;">
+    <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
+    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center; color:var(--slate);">কোনো রেকর্ড নেই</td></tr>'}</tbody>
+    </table>
+    </div>
+  `;
+  document.getElementById('detailModalBody').dataset.tcNo = tcNo;
+  openModalEl('detailModalOverlay');
+}
+
+/* =========================================================================
+   CONTRACTS VIEW
+   ========================================================================= */
+function renderContracts(){
+  const tbody = document.getElementById('contractsTbody');
+  if(staffList.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">কোনো স্টাফ নেই</td></tr>'; return; }
+  tbody.innerHTML = staffList.map(s=>{
+    const b = leaveBalance(s);
+    const ti = ticketInfo(s);
+    const tenure = tenureYearsMonthsDays(s.contractStart||s.joiningDate);
+    const dl = s.contractEnd? daysBetween(todayISO(), s.contractEnd) : null;
+    let statusHtml;
+    if(s.status==='Resigned') statusHtml = statusBadge('Cancelled').replace('Cancelled','Resigned');
+    else if(dl!==null && dl<0) statusHtml = '<span class="badge badge-danger">Expired</span>';
+    else if(dl!==null && dl<=60) statusHtml = '<span class="badge badge-warning">Expiring Soon</span>';
+    else statusHtml = '<span class="badge badge-success">Active</span>';
+    return `<tr>
+      <td>${s.tcNo}</td><td>${s.name}</td><td>${s.position}</td>
+      <td>${fmtDate(s.contractStart)} → ${fmtDate(s.contractEnd)}</td>
+      <td>${b.balance.toFixed(1)}</td>
+      <td>${ti.due?'<span class="badge badge-danger">Due</span>':fmtDate(ti.nextDue)}</td>
+      <td>${tenure.y}y ${tenure.m}m ${tenure.d}d</td>
+      <td>${statusHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* =========================================================================
+   LEAVE RECORDS VIEW
+   ========================================================================= */
+function setLeaveTab(tab){
+  currentLeaveTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="'+tab+'"]').classList.add('active');
+  renderLeaveTable();
+}
+
+function renderLeaveTable(){
+  const q = (document.getElementById('leaveSearch')?.value||'').toLowerCase();
+  const typeF = document.getElementById('leaveTypeFilter')?.value||'';
+
+  // populate type filter once
+  const typeSel = document.getElementById('leaveTypeFilter');
+  if(typeSel.options.length<=1){
+    const types = ['Annual','Local','Emergency','Ramadan Leave','Hajj Leave','National Day','Foundation Day','Marriage Leave','Unpaid Leave','Study Leave'];
+    types.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
+  }
+
+  let list = [...leaveList];
+  if(currentLeaveTab!=='all') list = list.filter(l=>l.status===currentLeaveTab);
+  if(typeF) list = list.filter(l=>l.type===typeF);
+  if(q) list = list.filter(l=> l.name.toLowerCase().includes(q) || l.tcNo.includes(q));
+
+  const tbody = document.getElementById('leaveTbody');
+  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--slate); padding:30px;">কোনো রেকর্ড নেই</td></tr>'; return; }
+
+  tbody.innerHTML = list.map(l=>{
+    let actions = '';
+    if(l.status==='Pending'){
+      actions = `<button class="btn btn-gold btn-sm" onclick="approveLeave('${l.id}')">Approve</button> <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button>`;
+    } else if(l.status==='Reserved'){
+      actions = `<button class="btn btn-outline btn-sm" onclick="startLeave('${l.id}')">Start</button> <button class="btn btn-ghost btn-sm" onclick="cancelLeave('${l.id}')">Cancel</button>`;
+    } else if(l.status==='On Leave'){
+      actions = `<button class="btn btn-gold btn-sm" onclick="openCloseModal('${l.id}')">Close / Return</button>`;
+    } else {
+      actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
+    }
+    return `<tr>
+      <td>${l.tcNo}</td><td>${l.name}</td><td>${l.type}</td>
+      <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
+      <td>${l.ticketType&&l.ticketType!=='None'?`<span class="badge badge-info">${l.ticketType}</span>`:'—'}</td>
+      <td>${statusBadge(l.status)}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderStaffSelects(){
+  const activeStaff = staffList.filter(s=>s.status!=='Resigned');
+  ['lv_tcNo','indStaffSelect'].forEach(id=>{
+    const sel = document.getElementById(id);
+    const currentVal = sel.value;
+    const placeholder = id==='lv_tcNo' ? '<option value="">— বেছে নিন —</option>' : '<option value="">— manual entry —</option>';
+    sel.innerHTML = placeholder + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
+    sel.value = currentVal;
+  });
+}
+
+/* ---- add / start / close / cancel leave ---- */
+function openLeaveModal(){
+  document.getElementById('lv_tcNo').value='';
+  document.getElementById('lv_tcNo').disabled = false;
+  document.getElementById('lv_type').value='Annual';
+  document.getElementById('lv_from').value='';
+  document.getElementById('lv_to').value='';
+  document.getElementById('lv_days').value='';
+  document.getElementById('lv_ticket').value='None';
+  document.getElementById('lv_status').value='Reserved';
+  document.getElementById('lv_remark').value='';
+  document.getElementById('lv_balanceNote').textContent='একজন স্টাফ বেছে নিন — ব্যালেন্স দেখানো হবে';
+  document.getElementById('lv_statusRow').style.display='';
+  document.getElementById('leaveModalTitle').textContent = 'নতুন লিভ এন্ট্রি';
+  openModalEl('leaveModalOverlay');
+}
+
+function calcLeaveDays(){
+  const f = document.getElementById('lv_from').value, t = document.getElementById('lv_to').value;
+  if(f && t){
+    const d = daysBetween(f,t)+1;
+    document.getElementById('lv_days').value = d>0? d : '';
+  }
+}
+
+function refreshLeaveModalBalance(){
+  const tcNo = document.getElementById('lv_tcNo').value;
+  const box = document.getElementById('lv_balanceNote');
+  if(!tcNo){ box.textContent='একজন স্টাফ বেছে নিন — ব্যালেন্স দেখানো হবে'; return; }
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  const b = leaveBalance(s);
+  const ti = ticketInfo(s);
+  box.innerHTML = `<b>${s.name}</b> — বর্তমান Annual Balance: <b>${b.balance.toFixed(2)} দিন</b> · পরবর্তী Air Ticket: <b>${ti.due?'Due Now':fmtDate(ti.nextDue)}</b>`;
+}
+
+async function saveLeave(){
+  const isSelfService = currentUser.role!=='admin';
+  const tcNo = document.getElementById('lv_tcNo').value;
+  const type = document.getElementById('lv_type').value;
+  const from = document.getElementById('lv_from').value;
+  const to = document.getElementById('lv_to').value;
+  const days = Number(document.getElementById('lv_days').value);
+  if(!tcNo || !from || !to || !days || days<=0){ toast('স্টাফ, তারিখ ও দিন সংখ্যা ঠিকমতো দিন', 'err'); return; }
+  if(isSelfService && tcNo!==currentUser.tcNo){ toast('আপনি শুধু নিজের জন্য আবেদন করতে পারবেন','err'); return; }
+  const s = staffList.find(x=>x.tcNo===tcNo);
+
+  const data = {
+    tcNo, name:s.name, type,
+    fromDate:from, toDate:to, days,
+    ticketType: document.getElementById('lv_ticket').value,
+    status: isSelfService ? 'Pending' : document.getElementById('lv_status').value,
+    remark: document.getElementById('lv_remark').value.trim(),
+    year: new Date(from).getFullYear(),
+    requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    await db.collection('leaves').add(data);
+    toast(isSelfService ? 'আপনার আবেদন Admin-এর কাছে পাঠানো হয়েছে' : 'লিভ এন্ট্রি সংরক্ষণ করা হয়েছে', 'ok');
+    closeModal('leaveModalOverlay');
+  }catch(err){ toast('সংরক্ষণ ব্যর্থ: '+err.message, 'err'); }
+}
+
+async function startLeave(id){
+  try{ await db.collection('leaves').doc(id).update({ status:'On Leave', startedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('লিভ শুরু হিসেবে মার্ক করা হয়েছে','ok'); }
+  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+}
+
+async function cancelLeave(id){
+  if(!confirm('এই লিভ রিজার্ভেশন বাতিল করবেন?')) return;
+  try{ await db.collection('leaves').doc(id).update({ status:'Cancelled' }); toast('বাতিল করা হয়েছে','ok'); }
+  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+}
+
+function openCloseModal(id){
+  const l = leaveList.find(x=>x.id===id);
+  if(!l) return;
+  document.getElementById('cl_leaveId').value = id;
+  document.getElementById('cl_summary').innerHTML = `<b>${l.name}</b> (TC ${l.tcNo}) — ${l.type}<br>${fmtDate(l.fromDate)} → ${fmtDate(l.toDate)} (${l.days} days planned)`;
+  document.getElementById('cl_returnDate').value = todayISO();
+  const showTicket = l.ticketType && l.ticketType!=='None';
+  document.getElementById('cl_ticketUsedWrap').style.display = showTicket?'block':'none';
+  openModalEl('closeModalOverlay');
+}
+
+async function confirmCloseLeave(){
+  const id = document.getElementById('cl_leaveId').value;
+  const returnDate = document.getElementById('cl_returnDate').value;
+  const l = leaveList.find(x=>x.id===id);
+  if(!returnDate){ toast('রিটার্ন তারিখ দিন','err'); return; }
+  const actualDays = daysBetween(l.fromDate, returnDate)+1;
+
+  const updates = {
+    status:'Closed', actualReturnDate:returnDate, days:actualDays>0?actualDays:l.days,
+    closedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    await db.collection('leaves').doc(id).update(updates);
+    const ticketBox = document.getElementById('cl_ticketUsedWrap');
+    if(ticketBox.style.display!=='none' && document.getElementById('cl_ticketUsed').checked){
+      await db.collection('staff').doc(l.tcNo).update({ lastTicket: l.fromDate });
+    }
+    toast('লিভ ক্লোজ করা হয়েছে — স্টাফ ফিরে এসেছে','ok');
+    closeModal('closeModalOverlay');
+  }catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+}
+
+/* =========================================================================
+   SAUDI LOCAL LEAVE
+   ========================================================================= */
+function populateYearSelector(){
+  const sel = document.getElementById('localLeaveYear');
+  if(sel.options.length>0) { loadLocalLeaveYear(); return; }
+  const y = new Date().getFullYear();
+  for(let i=y-1;i<=y+2;i++){ const o=document.createElement('option'); o.value=i; o.textContent=i; if(i===y) o.selected=true; sel.appendChild(o); }
+  // sensible defaults for fixed Saudi dates
+  const yr = y;
+  document.getElementById('ll_national_from').value = yr+'-09-23';
+  document.getElementById('ll_national_to').value = yr+'-09-23';
+  document.getElementById('ll_foundation_from').value = yr+'-02-22';
+  document.getElementById('ll_foundation_to').value = yr+'-02-22';
+  ['ll_national','ll_foundation','ll_ramadan','ll_hajj'].forEach(updateLocalLeaveDaysLabel);
+  ['ll_ramadan_from','ll_ramadan_to','ll_hajj_from','ll_hajj_to','ll_national_from','ll_national_to','ll_foundation_from','ll_foundation_to'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', ()=>{
+      const prefix = id.replace('_from','').replace('_to','');
+      updateLocalLeaveDaysLabel(prefix);
+    });
+  });
+  loadLocalLeaveYear();
+}
+function updateLocalLeaveDaysLabel(prefix){
+  const f = document.getElementById(prefix+'_from').value, t = document.getElementById(prefix+'_to').value;
+  const lbl = document.getElementById(prefix+'_days');
+  if(f&&t){ const d = daysBetween(f,t)+1; lbl.textContent = 'Days: ' + (d>0?d:'—'); }
+}
+function loadLocalLeaveYear(){
+  renderLocalLeaveHistory();
+}
+function renderLocalLeaveHistory(){
+  const year = Number(document.getElementById('localLeaveYear').value || new Date().getFullYear());
+  const types = ['Ramadan Leave','Hajj Leave','National Day','Foundation Day'];
+  const rows = leaveList.filter(l=> types.includes(l.type) && l.year===year).sort((a,b)=>a.type.localeCompare(b.type));
+  const tbody = document.getElementById('localLeaveHistoryTbody');
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:24px;">এই বছরের জন্য এখনো কিছু প্রয়োগ করা হয়নি</td></tr>'; return; }
+  tbody.innerHTML = rows.map(l=>`<tr><td>${l.type}</td><td>${l.tcNo}</td><td>${l.name}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td></tr>`).join('');
+}
+
+async function applyLocalLeave(type, fromId, toId){
+  const from = document.getElementById(fromId).value;
+  const to = document.getElementById(toId).value;
+  if(!from || !to){ toast('তারিখ দিন', 'err'); return; }
+  const days = daysBetween(from,to)+1;
+  if(days<=0){ toast('তারিখ সঠিক নয়', 'err'); return; }
+  const year = new Date(from).getFullYear();
+
+  const already = leaveList.filter(l=>l.type===type && l.year===year).map(l=>l.tcNo);
+  const targets = staffList.filter(s=> s.status==='Active' && !already.includes(s.tcNo));
+  if(targets.length===0){ toast('সব Active স্টাফের জন্য ইতিমধ্যে প্রয়োগ করা হয়েছে', 'err'); return; }
+
+  if(!confirm(`${targets.length} জন Active স্টাফের জন্য "${type}" (${days} দিন) প্রয়োগ করা হবে। নিশ্চিত?`)) return;
+
+  try{
+    const batch = db.batch();
+    targets.forEach(s=>{
+      const ref = db.collection('leaves').doc();
+      batch.set(ref, {
+        tcNo:s.tcNo, name:s.name, type, fromDate:from, toDate:to, days,
+        ticketType:'None', status:'Closed', remark:'Auto-applied local leave', year,
+        requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        closedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    toast(`"${type}" ${targets.length} জন স্টাফের জন্য প্রয়োগ করা হয়েছে`, 'ok');
+  }catch(err){ toast('ব্যর্থ: '+err.message, 'err'); }
+}
+
+/* =========================================================================
+   AIR TICKETS VIEW
+   ========================================================================= */
+function renderTicketCards(){
+  const wrap = document.getElementById('ticketCards');
+  const active = staffList.filter(s=>s.status!=='Resigned');
+  if(active.length===0){ wrap.innerHTML = '<div class="card empty" style="grid-column:1/-1;"><b>কোনো স্টাফ নেই</b></div>'; return; }
+  wrap.innerHTML = active.map(s=>{
+    const ti = ticketInfo(s);
+    const pct = Math.max(0, Math.min(100, 100 - (ti.daysLeft/(CFG.ticketCycleYears*365))*100));
+    const color = ti.due ? 'var(--danger)' : ti.daysLeft<90 ? 'var(--warning)' : 'var(--success)';
+    return `<div class="card card-pad">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+        <div class="ring" style="background:conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg);"><span>${ti.due?'DUE':ti.daysLeft+'d'}</span></div>
+        <div>
+          <div class="staff-name">${s.name}</div>
+          <div class="staff-role">TC ${s.tcNo} · ${s.position}</div>
+        </div>
+      </div>
+      <div class="k-v"><span>Last Ticket</span><span>${fmtDate(ti.base)}</span></div>
+      <div class="k-v"><span>Next Due</span><span>${fmtDate(ti.nextDue)}</span></div>
+      <div class="k-v"><span>Cycle</span><span>Every ${CFG.ticketCycleYears} years</span></div>
+      ${ti.due ? '<div class="warn-box" style="margin-top:10px;">এই স্টাফের Up-Down টিকেট এখনই প্রাপ্য</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+/* =========================================================================
+   INDEMNITY CALCULATOR
+   ========================================================================= */
+function fillIndemnityFromStaff(){
+  const tcNo = document.getElementById('indStaffSelect').value;
+  if(!tcNo) return;
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  document.getElementById('indJoining').value = s.joiningDate;
+  document.getElementById('indCurrent').value = todayISO();
+  document.getElementById('indSalary').value = s.salary;
+  document.getElementById('indFood').value = s.food;
+  document.getElementById('indHouse').value = s.house;
+  const unpaid = leaveList.filter(l=>l.tcNo===tcNo && l.type==='Unpaid Leave').reduce((a,l)=>a+(Number(l.days)||0),0);
+  document.getElementById('indUnpaid').value = unpaid;
+}
+
+function calcIndemnity(){
+  const joining = document.getElementById('indJoining').value;
+  const current = document.getElementById('indCurrent').value;
+  if(!joining || !current){ toast('তারিখ দিন','err'); return; }
+  const salary = Number(document.getElementById('indSalary').value)||0;
+  const food = Number(document.getElementById('indFood').value)||0;
+  const house = Number(document.getElementById('indHouse').value)||0;
+  const unpaidDays = Number(document.getElementById('indUnpaid').value)||0;
+  const type = document.getElementById('indType').value;
+  const totalMonthly = salary+food+house;
+  const dailyRate = totalMonthly/30;
+
+  const totalDays = daysBetween(joining, current);
+  const years = totalDays/365;
+
+  // Saudi law: 0.5 month/year for first 5 years, 1 month/year after
+  let indemnityMonths = 0;
+  if(years<=5){ indemnityMonths = years*0.5; }
+  else{ indemnityMonths = 5*0.5 + (years-5)*1; }
+  let indemnity = indemnityMonths*totalMonthly;
+
+  let factor = 1;
+  if(type==='two_third') factor = 2/3;
+  else if(type==='one_third') factor = 1/3;
+  indemnity = indemnity*factor;
+
+  const unpaidDeduction = unpaidDays*dailyRate;
+  const grandTotal = Math.max(0, indemnity-unpaidDeduction);
+
+  document.getElementById('indemnityResult').innerHTML = `
+    <div class="k-v"><span>Total Service</span><span>${years.toFixed(2)} years (${totalDays} days)</span></div>
+    <div class="k-v"><span>Total Monthly Package</span><span>${totalMonthly.toFixed(2)} SAR</span></div>
+    <div class="k-v"><span>Indemnity (before factor)</span><span>${(indemnityMonths*totalMonthly).toFixed(2)} SAR</span></div>
+    <div class="k-v"><span>Applied Factor</span><span>${(factor*100).toFixed(0)}%</span></div>
+    <div class="k-v"><span>Indemnity (after factor)</span><span>${indemnity.toFixed(2)} SAR</span></div>
+    <div class="k-v"><span>Unpaid Leave Deduction (${unpaidDays} days)</span><span style="color:var(--danger);">− ${unpaidDeduction.toFixed(2)} SAR</span></div>
+    <div class="k-v" style="border-bottom:none; margin-top:8px; padding-top:14px; border-top:2px solid var(--gold);">
+      <span style="font-weight:800; color:var(--navy); font-size:15px;">Grand Total Indemnity</span>
+      <span style="font-weight:800; color:var(--navy); font-size:18px;">${grandTotal.toFixed(2)} SAR</span>
+    </div>
+  `;
+}
+
+/* =========================================================================
+   SETTINGS
+   ========================================================================= */
+async function saveConfig(){
+  const data = {
+    rateBeforeFive: Number(document.getElementById('cfgRateBefore').value)||21,
+    rateAfterFive: Number(document.getElementById('cfgRateAfter').value)||30,
+    ticketCycleYears: Number(document.getElementById('cfgTicketCycle').value)||2,
+    fiveYearDays: 1825
+  };
+  try{ await db.collection('settings').doc('appConfig').set(data,{merge:true}); toast('সেটিংস সংরক্ষণ করা হয়েছে','ok'); }
+  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+}
+
+/* =========================================================================
+   PRINT LEAVE FORM
+   ========================================================================= */
+function printLeaveForm(){
+  const tcNo = document.getElementById('detailModalBody').dataset.tcNo;
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  if(!s){ toast('স্টাফ পাওয়া যায়নি','err'); return; }
+  const b = leaveBalance(s);
+  document.getElementById('printBody').innerHTML = `
+    <table style="width:100%; border-collapse:collapse;">
+      <tr><td style="padding:6px 0;"><b>DEPARTMENT:</b> ${s.department}</td><td><b>DATE:</b> ${fmtDate(todayISO())}</td></tr>
+      <tr><td style="padding:6px 0;"><b>NAME:</b> ${s.name}</td><td><b>TC NO:</b> ${s.tcNo}</td></tr>
+      <tr><td style="padding:6px 0;"><b>POSITION:</b> ${s.position}</td><td><b>NATIONALITY:</b> ${s.nationality||'—'}</td></tr>
+      <tr><td colspan="2" style="padding:14px 0 6px;"><b>CURRENT ANNUAL LEAVE BALANCE:</b> ${b.balance.toFixed(2)} days</td></tr>
+    </table>
+    <div style="margin-top:24px; display:flex; justify-content:space-between;">
+      <div>Employee Signature: _______________</div>
+      <div>Department Head: _______________</div>
+      <div>General Manager: _______________</div>
+    </div>
+  `;
+  document.getElementById('printArea').style.display='block';
+  window.print();
+  document.getElementById('printArea').style.display='none';
+}
+</script>
+</body>
+</html>
