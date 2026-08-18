@@ -511,13 +511,26 @@ tr:hover td{ background:#FBFAF6; }
           </div>
           <div class="field admin-only" id="lr_staffField">
             <label>Staff *</label>
-            <select id="lr_tcNo"><option value="">Select Staff</option></select>
+            <select id="lr_tcNo" onchange="refreshAllRowsCalc()"><option value="">Select Staff</option></select>
           </div>
         </div>
 
-        <div id="matrixRowsContainer" style="margin-top:6px;"></div>
+        <div class="tbl-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr>
+            <th style="min-width:170px;">Leave Type</th>
+            <th>Leave Balance</th>
+            <th>Year</th>
+            <th style="min-width:150px;">Start Date</th>
+            <th>End Date</th>
+            <th style="min-width:80px;">Days</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="matrixRowsContainer"></tbody>
+        </table>
+        </div>
 
-        <button type="button" class="btn btn-outline" onclick="addMatrixRow()">+ Add Matrix</button>
+        <button type="button" class="btn btn-outline" style="margin-top:14px;" onclick="addMatrixRow()">+ Add Matrix</button>
 
         <div style="margin-top:20px;">
           <button class="btn btn-gold" onclick="submitLeaveRequest()">Save</button>
@@ -815,6 +828,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(err=>console.error('Persistence error:', err));
 const db = firebase.firestore();
 // secondary app instance — lets an Admin create a new staff login (Firebase Auth account)
 // WITHOUT signing themselves out (a well-known client-side Firebase trick).
@@ -1178,29 +1192,55 @@ function leaveTypeOptionsHTML(selected){
   return LEAVE_TYPES.map(t=>`<option value="${t}" ${t===selected?'selected':''}>${t}</option>`).join('');
 }
 
-function matrixRowHTML(rowId){
-  return `<div class="card card-pad matrix-row" data-row-id="${rowId}" style="margin-bottom:12px; background:var(--cream);">
-    <div class="form-row c3">
-      <div class="field"><label>Leave Type *</label>
-        <select class="mr-type" onchange="">
-          <option value="">Select Leave Type</option>
-          ${leaveTypeOptionsHTML()}
-        </select>
-      </div>
-      <div class="field"><label>Start Date *</label><input type="date" class="mr-start" oninput="updateRowEndDate('${rowId}')"></div>
-      <div class="field"><label>Days *</label><input type="number" min="1" class="mr-days" placeholder="Enter Days" oninput="updateRowEndDate('${rowId}')"></div>
-    </div>
-    <div class="form-row" style="align-items:flex-end;">
-      <div class="field"><label>End Date</label><input type="text" class="mr-end" readonly placeholder="Automatically Calculated" style="background:#F0ECE1;"></div>
-      <div class="field" style="display:flex; align-items:flex-end;"><button type="button" class="btn btn-danger btn-sm" onclick="removeMatrixRow('${rowId}')">Delete</button></div>
-    </div>
-  </div>`;
+function currentLeaveRequestStaff(){
+  const tcNo = (currentUser && currentUser.role==='admin') ? document.getElementById('lr_tcNo').value : (currentUser && currentUser.tcNo);
+  return staffList.find(x=>x.tcNo===tcNo) || null;
+}
+
+// Leave Balance is tracked precisely only for Annual Leave (accrual-based). Other leave
+// types don't have a running quota in this system, so their balance shows "—".
+function rowBalanceDisplay(type, asOfDate){
+  const staff = currentLeaveRequestStaff();
+  if(!staff || type!=='Annual Leave') return '—';
+  const accrued = accruedAnnualLeave(staff.joiningDate, asOfDate || todayISO());
+  const taken = annualLeaveTakenDays(staff.tcNo);
+  return (accrued - taken).toFixed(1);
+}
+
+function matrixRowHTML(rowId, prefillStart){
+  return `<tr class="matrix-row" data-row-id="${rowId}">
+    <td>
+      <select class="mr-type" style="min-width:160px;" onchange="updateRowCalc('${rowId}')">
+        <option value="">Select Leave Type</option>
+        ${leaveTypeOptionsHTML()}
+      </select>
+    </td>
+    <td class="mr-balance" style="white-space:nowrap;">—</td>
+    <td class="mr-year" style="white-space:nowrap;">—</td>
+    <td><input type="date" class="mr-start" value="${prefillStart||''}" onchange="updateRowCalc('${rowId}')" style="min-width:150px;"></td>
+    <td class="mr-end" style="white-space:nowrap; color:var(--slate);">—</td>
+    <td><input type="number" min="1" class="mr-days" placeholder="Days" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
+    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeMatrixRow('${rowId}')">✕</button></td>
+  </tr>`;
 }
 
 function addMatrixRow(){
   matrixRowSeq++;
   const rowId = 'row' + matrixRowSeq;
-  document.getElementById('matrixRowsContainer').insertAdjacentHTML('beforeend', matrixRowHTML(rowId));
+  // Auto-chain: new row's Start Date defaults to the day after the previous row's End Date
+  let prefillStart = '';
+  const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
+  if(rows.length>0){
+    const lastRow = rows[rows.length-1];
+    const lastEndIso = lastRow.querySelector('.mr-end').dataset.iso;
+    if(lastEndIso){
+      const next = new Date(lastEndIso);
+      next.setDate(next.getDate()+1);
+      prefillStart = next.toISOString().slice(0,10);
+    }
+  }
+  document.getElementById('matrixRowsContainer').insertAdjacentHTML('beforeend', matrixRowHTML(rowId, prefillStart));
+  if(prefillStart) updateRowCalc(rowId);
 }
 
 function removeMatrixRow(rowId){
@@ -1211,23 +1251,38 @@ function removeMatrixRow(rowId){
   if(el) el.remove();
 }
 
-function updateRowEndDate(rowId){
+function updateRowCalc(rowId){
   const row = document.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
   if(!row) return;
+  const type = row.querySelector('.mr-type').value;
   const start = row.querySelector('.mr-start').value;
   const days = Number(row.querySelector('.mr-days').value);
-  const endInput = row.querySelector('.mr-end');
+  const endCell = row.querySelector('.mr-end');
+  const yearCell = row.querySelector('.mr-year');
+  const balanceCell = row.querySelector('.mr-balance');
+
+  // End Date — automatically calculated (Start Date counts as Day 1)
   if(start && days>0){
     const endDate = new Date(start);
     endDate.setDate(endDate.getDate() + (days-1));
     const iso = endDate.toISOString().slice(0,10);
     const [y,m,d] = iso.split('-');
-    endInput.value = `${d}/${m}/${y}`;
-    endInput.dataset.iso = iso;
+    endCell.textContent = `${d}/${m}/${y}`;
+    endCell.dataset.iso = iso;
   } else {
-    endInput.value = '';
-    endInput.dataset.iso = '';
+    endCell.textContent = '—';
+    endCell.dataset.iso = '';
   }
+
+  // Year — from the Start Date
+  yearCell.textContent = start ? new Date(start).getFullYear() : '—';
+
+  // Leave Balance — projected as of the selected Start Date (or today if not yet chosen)
+  balanceCell.textContent = rowBalanceDisplay(type, start);
+}
+
+function refreshAllRowsCalc(){
+  document.querySelectorAll('#matrixRowsContainer .matrix-row').forEach(row=> updateRowCalc(row.dataset.rowId));
 }
 
 function openLeaveRequestPage(){
