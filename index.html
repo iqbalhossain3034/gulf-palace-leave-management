@@ -264,7 +264,7 @@ tr:hover td{ background:#FBFAF6; }
 <!-- ===================== LOADING ===================== -->
 <div id="loadingScreen" class="loading-screen">
   <div class="spinner"></div>
-  <div>লোড হচ্ছে…</div>
+  <div>Loading…</div>
 </div>
 
 <!-- ===================== LOGIN ===================== -->
@@ -272,18 +272,17 @@ tr:hover td{ background:#FBFAF6; }
   <div class="login-card">
     <div class="brand-mark">GP</div>
     <h1>The Gulf Palace — Dammam</h1>
-    <div class="login-sub bn">Leave &amp; Vacation Management System</div>
+    <div class="login-sub">Leave &amp; Vacation Management System</div>
     <div id="loginError" class="login-error"></div>
     <div class="field">
-      <label class="bn">TC নম্বর <span style="font-weight:400; color:var(--slate-light);">(যেমন 3034)</span></label>
-      <input type="text" id="loginTc" placeholder="3034" autocomplete="username" inputmode="numeric">
+      <label>Username</label>
+      <input type="text" id="loginTc" placeholder="Username" autocomplete="username" inputmode="numeric">
     </div>
     <div class="field">
       <label>Password</label>
       <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
     </div>
     <button class="btn btn-gold btn-block" onclick="doLogin()">Sign In</button>
-    <div class="login-foot bn">প্রতিটি স্টাফ তার নিজের TC নম্বর দিয়ে লগইন করবে। Admin অ্যাক্সেসের জন্যও একই পদ্ধতি প্রযোজ্য।</div>
   </div>
 </div>
 
@@ -318,9 +317,17 @@ tr:hover td{ background:#FBFAF6; }
     </div>
 
     <div class="nav-group-label">Leave</div>
-    <div class="nav-item admin-only" data-view="leave" onclick="showView('leave')">
+    <div class="nav-item" data-view="leaveRequest" onclick="showView('leaveRequest')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      Leave Request
+    </div>
+    <div class="nav-item" data-view="leaveDetails" onclick="showView('leaveDetails')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-      Leave Records
+      Leave Details
+    </div>
+    <div class="nav-item" data-view="leaveApproved" onclick="showView('leaveApproved')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      Leave Approved
     </div>
     <div class="nav-item admin-only" data-view="approvals" onclick="showView('approvals')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><rect x="3" y="5" width="18" height="16" rx="2"/></svg>
@@ -348,7 +355,7 @@ tr:hover td{ background:#FBFAF6; }
     <div class="side-foot">
       <div class="side-user"><span class="dot"></span> <span id="sideUserEmail">—</span></div>
       <div style="font-size:11px; color:var(--gold-light); margin-top:2px;" id="sideUserRole"></div>
-      <a class="logout-link" onclick="doLogout()">সাইন আউট করুন →</a>
+      <a class="logout-link" onclick="doLogout()">Sign Out →</a>
     </div>
   </aside>
 
@@ -359,12 +366,11 @@ tr:hover td{ background:#FBFAF6; }
     <section id="view-dashboard" class="view">
       <div class="topbar">
         <div>
-          <h2 id="dashTitle">ড্যাশবোর্ড</h2>
+          <h2 id="dashTitle">Dashboard</h2>
           <div class="sub" id="dashSub">Laundry Department · The Gulf Palace, Dammam</div>
           <div class="divider-motif"></div>
         </div>
-        <button class="btn btn-gold admin-only" onclick="openLeaveModal()">+ নতুন লিভ এন্ট্রি</button>
-        <button class="btn btn-gold staff-only" style="display:none;" onclick="openStaffRequestModal()">+ লিভের জন্য আবেদন করুন</button>
+        <button class="btn btn-gold" onclick="showView('leaveRequest')">+ New Leave Request</button>
       </div>
 
       <!-- ===== STAFF PERSONAL SUMMARY (staff role only) ===== -->
@@ -386,7 +392,7 @@ tr:hover td{ background:#FBFAF6; }
           </div>
         </div>
         <div class="card card-pad">
-          <div class="section-title">আমার লিভ হিস্ট্রি</div>
+          <div class="section-title">My Leave History</div>
           <div class="tbl-wrap">
           <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
           <tbody id="myLeaveTbody"></tbody></table>
@@ -425,11 +431,11 @@ tr:hover td{ background:#FBFAF6; }
 
       <div class="grid grid-2">
         <div class="card card-pad">
-          <div class="section-title">স্টাফ লিভ ব্যালেন্স</div>
+          <div class="section-title">Staff Leave Balance</div>
           <div id="dashBalanceList"></div>
         </div>
         <div class="card card-pad">
-          <div class="section-title">সাম্প্রতিক লিভ কার্যক্রম</div>
+          <div class="section-title">Recent Leave Activity</div>
           <div id="dashRecentActivity"></div>
         </div>
       </div>
@@ -439,7 +445,7 @@ tr:hover td{ background:#FBFAF6; }
     <!-- ================= APPROVALS (admin only) ================= -->
     <section id="view-approvals" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>লিভ অনুমোদন</h2><div class="sub">স্টাফদের পাঠানো লিভ রিকোয়েস্ট অনুমোদন/বাতিল করুন</div><div class="divider-motif"></div></div>
+        <div><h2>Approvals</h2><div class="sub">Approve or reject leave requests submitted by staff</div><div class="divider-motif"></div></div>
       </div>
       <div class="card">
         <div class="tbl-wrap">
@@ -454,16 +460,16 @@ tr:hover td{ background:#FBFAF6; }
     <!-- ================= STAFF ================= -->
     <section id="view-staff" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>স্টাফ ডিরেক্টরি</h2><div class="sub">সকল কর্মীর প্রোফাইল ও লিভ ব্যালেন্স</div><div class="divider-motif"></div></div>
-        <button class="btn btn-gold" onclick="openStaffModal()">+ নতুন স্টাফ যোগ করুন</button>
+        <div><h2>Staff Directory</h2><div class="sub">Profile and leave balance for all staff</div><div class="divider-motif"></div></div>
+        <button class="btn btn-gold" onclick="openStaffModal()">+ Add New Staff</button>
       </div>
       <div class="toolbar">
         <div class="search-box">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="staffSearch" oninput="renderStaffGrid()" placeholder="নাম বা TC নম্বর দিয়ে খুঁজুন…">
+          <input id="staffSearch" oninput="renderStaffGrid()" placeholder="Search by name...">
         </div>
         <select class="select-pill" id="staffStatusFilter" onchange="renderStaffGrid()">
-          <option value="">সব স্ট্যাটাস</option>
+          <option value="">All Statuses</option>
           <option value="Active">Active</option>
           <option value="On Leave">On Leave</option>
           <option value="Resigned">Resigned</option>
@@ -475,7 +481,7 @@ tr:hover td{ background:#FBFAF6; }
     <!-- ================= CONTRACTS ================= -->
     <section id="view-contracts" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>কন্ট্রাক্ট বিবরণ</h2><div class="sub">Contract period, balance ও renewal status</div><div class="divider-motif"></div></div>
+        <div><h2>Contracts</h2><div class="sub">Contract period, balance, and renewal status</div><div class="divider-motif"></div></div>
       </div>
       <div class="card">
         <div class="tbl-wrap">
@@ -488,32 +494,71 @@ tr:hover td{ background:#FBFAF6; }
     </section>
 
     <!-- ================= LEAVE RECORDS ================= -->
-    <section id="view-leave" class="view" style="display:none;">
+    <section id="view-leaveRequest" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>লিভ রেকর্ডস</h2><div class="sub">Reservation → On Leave → Closed workflow</div><div class="divider-motif"></div></div>
-        <button class="btn btn-gold" onclick="openLeaveModal()">+ নতুন লিভ এন্ট্রি</button>
+        <div><h2>Leave Request</h2><div class="sub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
       </div>
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="all" onclick="setLeaveTab('all')">সব</button>
-        <button class="tab-btn" data-tab="Pending" onclick="setLeaveTab('Pending')">Pending</button>
-        <button class="tab-btn" data-tab="Reserved" onclick="setLeaveTab('Reserved')">Reserved</button>
-        <button class="tab-btn" data-tab="On Leave" onclick="setLeaveTab('On Leave')">On Leave</button>
-        <button class="tab-btn" data-tab="Closed" onclick="setLeaveTab('Closed')">Closed</button>
+      <div class="card card-pad">
+        <div class="form-row">
+          <div class="field">
+            <label>Leave Category *</label>
+            <select id="lr_category">
+              <option value="">Select Leave Category</option>
+              <option value="Emergency">Emergency</option>
+              <option value="Local">Local</option>
+              <option value="Annual Leave">Annual Leave</option>
+            </select>
+          </div>
+          <div class="field admin-only" id="lr_staffField">
+            <label>Staff *</label>
+            <select id="lr_tcNo"><option value="">Select Staff</option></select>
+          </div>
+        </div>
+
+        <div id="matrixRowsContainer" style="margin-top:6px;"></div>
+
+        <button type="button" class="btn btn-outline" onclick="addMatrixRow()">+ Add Matrix</button>
+
+        <div style="margin-top:20px;">
+          <button class="btn btn-gold" onclick="submitLeaveRequest()">Save</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LEAVE DETAILS ================= -->
+    <section id="view-leaveDetails" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>Leave Details</h2><div class="sub">All leave requests and their status</div><div class="divider-motif"></div></div>
       </div>
       <div class="toolbar">
         <div class="search-box">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="নাম বা TC দিয়ে খুঁজুন…">
+          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="Search by name...">
         </div>
         <select class="select-pill" id="leaveTypeFilter" onchange="renderLeaveTable()">
-          <option value="">সব ধরন</option>
+          <option value="">All Types</option>
         </select>
       </div>
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>TC No</th><th>Name</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Ticket</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>Name</th><th>Category</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th><th>Action</th></tr></thead>
           <tbody id="leaveTbody"></tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LEAVE APPROVED ================= -->
+    <section id="view-leaveApproved" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>Leave Approved</h2><div class="sub">Approved leave records</div><div class="divider-motif"></div></div>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Category</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th></tr></thead>
+          <tbody id="leaveApprovedTbody"></tbody>
         </table>
         </div>
       </div>
@@ -522,11 +567,11 @@ tr:hover td{ background:#FBFAF6; }
     <!-- ================= LOCAL LEAVE ================= -->
     <section id="view-localLeave" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>সৌদি লোকাল লিভ ক্যালেন্ডার</h2><div class="sub">Ramadan, Hajj, National Day, Foundation Day — অটোমেটিক প্রয়োগ</div><div class="divider-motif"></div></div>
+        <div><h2>Saudi Local Leave Calendar</h2><div class="sub">Ramadan, Hajj, National Day, Foundation Day — auto-apply</div><div class="divider-motif"></div></div>
         <select class="select-pill" id="localLeaveYear" onchange="loadLocalLeaveYear()"></select>
       </div>
       <div class="note-box" style="margin-bottom:18px;">
-        প্রতি বছর Ramadan ও Hajj-এর তারিখ হিজরি ক্যালেন্ডার অনুযায়ী পরিবর্তিত হয় — তাই এই দুটো নিজে বসাতে হবে। National Day (২৩ সেপ্টেম্বর) ও Foundation Day (২২ ফেব্রুয়ারি) প্রতি বছর ফিক্সড, তাই ডিফল্ট বসানো আছে। তারিখ ঠিক করে "সব Active স্টাফে প্রয়োগ করুন" চাপুন — প্রতিটি স্টাফের জন্য স্বয়ংক্রিয়ভাবে লিভ রেকর্ড তৈরি হবে।
+        Ramadan and Hajj dates follow the Hijri calendar and change every year, so please set these manually. National Day (23 Sept) and Foundation Day (22 Feb) are fixed each year, so defaults are pre-filled. Set the dates and click "Apply to all Active staff" and a leave record will be created automatically for every staff member.
       </div>
       <div class="grid grid-2">
         <div class="card card-pad">
@@ -536,7 +581,7 @@ tr:hover td{ background:#FBFAF6; }
             <div class="field"><label>To</label><input type="date" id="ll_ramadan_to"></div>
           </div>
           <div class="hint" id="ll_ramadan_days">Days: —</div>
-          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Ramadan Leave','ll_ramadan_from','ll_ramadan_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Ramadan Leave','ll_ramadan_from','ll_ramadan_to')">Apply to all Active staff</button>
         </div>
         <div class="card card-pad">
           <div class="section-title">🕋 Hajj Leave</div>
@@ -545,7 +590,7 @@ tr:hover td{ background:#FBFAF6; }
             <div class="field"><label>To</label><input type="date" id="ll_hajj_to"></div>
           </div>
           <div class="hint" id="ll_hajj_days">Days: —</div>
-          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Hajj Leave','ll_hajj_from','ll_hajj_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Hajj Leave','ll_hajj_from','ll_hajj_to')">Apply to all Active staff</button>
         </div>
         <div class="card card-pad">
           <div class="section-title">🇸🇦 National Day</div>
@@ -554,7 +599,7 @@ tr:hover td{ background:#FBFAF6; }
             <div class="field"><label>To</label><input type="date" id="ll_national_to"></div>
           </div>
           <div class="hint" id="ll_national_days">Days: —</div>
-          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('National Day','ll_national_from','ll_national_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('National Day','ll_national_from','ll_national_to')">Apply to all Active staff</button>
         </div>
         <div class="card card-pad">
           <div class="section-title">🏛️ Foundation Day</div>
@@ -563,12 +608,12 @@ tr:hover td{ background:#FBFAF6; }
             <div class="field"><label>To</label><input type="date" id="ll_foundation_to"></div>
           </div>
           <div class="hint" id="ll_foundation_days">Days: —</div>
-          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Foundation Day','ll_foundation_from','ll_foundation_to')">সব Active স্টাফে প্রয়োগ করুন</button>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="applyLocalLeave('Foundation Day','ll_foundation_from','ll_foundation_to')">Apply to all Active staff</button>
         </div>
       </div>
 
       <div class="card card-pad" style="margin-top:18px;">
-        <div class="section-title">এই বছরের প্রয়োগ ইতিহাস</div>
+        <div class="section-title">This Year's Applied History</div>
         <div class="tbl-wrap">
         <table>
           <thead><tr><th>Type</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th></tr></thead>
@@ -581,18 +626,18 @@ tr:hover td{ background:#FBFAF6; }
     <!-- ================= AIR TICKETS ================= -->
     <section id="view-tickets" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>এয়ার টিকেট ট্র্যাকার</h2><div class="sub">প্রতি ২ বছর পর পর Up-Down টিকেট এন্টাইটেলমেন্ট</div><div class="divider-motif"></div></div>
+        <div><h2>Air Ticket Tracker</h2><div class="sub">Up-Down ticket entitlement every 2 years</div><div class="divider-motif"></div></div>
       </div>
       <div class="grid grid-3" id="ticketCards"></div>
     </section>
 
     <!-- ================= INDEMNITY ================= -->
     <section id="view-indemnity" class="view" style="display:none;">
-      <div class="topbar"><div><h2>ইনডেমনিটি ক্যালকুলেটর</h2><div class="sub">End of Service Benefit হিসাব (Saudi Labor Law অনুসারে)</div><div class="divider-motif"></div></div></div>
+      <div class="topbar"><div><h2>Indemnity Calculator</h2><div class="sub">End of Service Benefit calculation (per Saudi Labor Law)</div><div class="divider-motif"></div></div></div>
       <div class="grid grid-2">
         <div class="card card-pad">
-          <div class="section-title">ইনপুট</div>
-          <div class="field"><label>স্টাফ বেছে নিন</label>
+          <div class="section-title">Input</div>
+          <div class="field"><label>Select Staff</label>
             <select id="indStaffSelect" onchange="fillIndemnityFromStaff()"><option value="">— manual entry —</option></select>
           </div>
           <div class="form-row">
@@ -612,12 +657,12 @@ tr:hover td{ background:#FBFAF6; }
               <option value="one_third">Resigned 2–5 years service (1/3)</option>
             </select>
           </div>
-          <button class="btn btn-gold btn-block" onclick="calcIndemnity()">হিসাব করুন</button>
+          <button class="btn btn-gold btn-block" onclick="calcIndemnity()">Calculate</button>
         </div>
         <div class="card card-pad">
-          <div class="section-title">ফলাফল</div>
+          <div class="section-title">Result</div>
           <div id="indemnityResult">
-            <div class="empty"><b>এখনও হিসাব করা হয়নি</b>বাম পাশের ফর্ম পূরণ করে "হিসাব করুন" চাপুন</div>
+            <div class="empty"><b>No calculation yet</b>Fill in the form on the left and click "Calculate"</div>
           </div>
         </div>
       </div>
@@ -625,24 +670,24 @@ tr:hover td{ background:#FBFAF6; }
 
     <!-- ================= SETTINGS ================= -->
     <section id="view-settings" class="view" style="display:none;">
-      <div class="topbar"><div><h2>সেটিংস</h2><div class="sub">লিভ পলিসি ও সিস্টেম কনফিগারেশন</div><div class="divider-motif"></div></div></div>
+      <div class="topbar"><div><h2>Settings</h2><div class="sub">Leave policy and system configuration</div><div class="divider-motif"></div></div></div>
       <div class="grid grid-2">
         <div class="card card-pad">
           <div class="section-title">Annual Leave Accrual Policy</div>
           <div class="form-row">
-            <div class="field"><label>প্রথম ৫ বছর (দিন/বছর)</label><input type="number" id="cfgRateBefore"></div>
-            <div class="field"><label>৫ বছর পর (দিন/বছর)</label><input type="number" id="cfgRateAfter"></div>
+            <div class="field"><label>First 5 years (days/year)</label><input type="number" id="cfgRateBefore"></div>
+            <div class="field"><label>After 5 years (days/year)</label><input type="number" id="cfgRateAfter"></div>
           </div>
-          <div class="field"><label>Ticket Cycle (বছর)</label><input type="number" id="cfgTicketCycle"></div>
-          <button class="btn btn-primary" onclick="saveConfig()">সংরক্ষণ করুন</button>
+          <div class="field"><label>Ticket Cycle (years)</label><input type="number" id="cfgTicketCycle"></div>
+          <button class="btn btn-primary" onclick="saveConfig()">Save</button>
         </div>
         <div class="card card-pad">
-          <div class="section-title">অ্যাকাউন্ট</div>
+          <div class="section-title">Account</div>
           <div class="k-v"><span>Signed in as</span><span id="cfgUserEmail">—</span></div>
           <div class="k-v"><span>Firebase Project</span><span id="cfgProjectId">—</span></div>
           <div class="k-v"><span>Total Staff</span><span id="cfgStaffCount">0</span></div>
           <div class="k-v"><span>Total Leave Records</span><span id="cfgLeaveCount">0</span></div>
-          <div class="warn-box" style="margin-top:14px;">এই অ্যাপ ব্যবহার করার আগে নিচের firebaseConfig অংশে আপনার নিজের Firebase প্রজেক্টের credentials বসিয়ে নিন, এবং Firestore-এ একটি Admin ইউজার তৈরি করুন (Firebase Console → Authentication)।</div>
+          <div class="warn-box" style="margin-top:14px;">Before using this app, insert your own Firebase project credentials in the firebaseConfig section below, and create an Admin user in Authentication (Firebase Console -> Authentication).</div>
         </div>
       </div>
     </section>
@@ -654,16 +699,16 @@ tr:hover td{ background:#FBFAF6; }
 <!-- ===================== MODAL: STAFF ===================== -->
 <div class="overlay" id="staffModalOverlay">
   <div class="modal wide">
-    <div class="modal-head"><h3 id="staffModalTitle">নতুন স্টাফ যোগ করুন</h3><button class="modal-close" onclick="closeModal('staffModalOverlay')">✕</button></div>
+    <div class="modal-head"><h3 id="staffModalTitle">Add New Staff</h3><button class="modal-close" onclick="closeModal('staffModalOverlay')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="staffDocId">
       <div class="form-row c3">
-        <div class="field"><label>TC No *</label><input id="s_tcNo" placeholder="যেমন 3050"></div>
+        <div class="field"><label>TC No *</label><input id="s_tcNo" placeholder="e.g. 3050"></div>
         <div class="field"><label>Name *</label><input id="s_name" placeholder="Full name"></div>
-        <div class="field"><label>Position *</label><input id="s_position" placeholder="যেমন Laundry man"></div>
+        <div class="field"><label>Position *</label><input id="s_position" placeholder="e.g. Laundry man"></div>
       </div>
       <div class="form-row c3">
-        <div class="field"><label>Nationality</label><input id="s_nationality" placeholder="যেমন Bgl"></div>
+        <div class="field"><label>Nationality</label><input id="s_nationality" placeholder="e.g. Bgl"></div>
         <div class="field"><label>Department</label><input id="s_department" value="Laundry"></div>
         <div class="field"><label>Status</label>
           <select id="s_status"><option>Active</option><option>On Leave</option><option>Resigned</option></select>
@@ -671,17 +716,17 @@ tr:hover td{ background:#FBFAF6; }
       </div>
       <div class="form-row">
         <div class="field"><label>App Role</label>
-          <select id="s_role"><option value="staff">Staff (নিজের তথ্য দেখতে ও রিকোয়েস্ট পাঠাতে পারবে)</option><option value="admin">Admin (সব কিছু ম্যানেজ করতে পারবে)</option></select>
+          <select id="s_role"><option value="staff">Staff (can view own data and submit requests)</option><option value="admin">Admin (can manage everything)</option></select>
         </div>
       </div>
       <div class="card card-pad" style="background:var(--cream); margin:4px 0 18px;" id="s_loginBox">
         <div class="section-title" style="margin-bottom:8px;">🔐 App Login</div>
-        <div id="s_loginStatus" class="note-box" style="margin-bottom:10px;">Username হবে স্টাফের TC নম্বর (উদাহরণ: TC 3034 → Username <b>3034</b>)।</div>
+        <div id="s_loginStatus" class="note-box" style="margin-bottom:10px;">Username will be the staff's TC number (example: TC 3034 -> Username <b>3034</b>).</div>
         <div class="form-row">
-          <div class="field"><label>Password <span class="hint">(কমপক্ষে ৬ ক্যারেক্টার)</span></label><input type="text" id="s_newPassword" placeholder="যেমন Iqbal1722"></div>
-          <div class="field" style="display:flex; align-items:flex-end;"><button type="button" class="btn btn-outline btn-block" id="s_createLoginBtn" onclick="handleCreateStaffLogin()">লগইন তৈরি করুন</button></div>
+          <div class="field"><label>Password <span class="hint">(at least 6 characters)</span></label><input type="text" id="s_newPassword" placeholder="e.g. Iqbal1722"></div>
+          <div class="field" style="display:flex; align-items:flex-end;"><button type="button" class="btn btn-outline btn-block" id="s_createLoginBtn" onclick="handleCreateStaffLogin()">Create Login</button></div>
         </div>
-        <div class="hint">যদি "email already in use" এরর দেখান তাহলে এই TC-এর লগইন আগে থেকেই আছে — পরিবর্তন করতে Firebase Console → Authentication → Users থেকে আগেরটা Delete করে আবার তৈরি করুন।</div>
+        <div class="hint">If you see an "email already in use" error, a login for this TC already exists. To change it, delete the old one from Firebase Console -> Authentication -> Users and create it again.</div>
       </div>
       <div class="form-row c3">
         <div class="field"><label>Joining Date *</label><input type="date" id="s_joining"></div>
@@ -695,65 +740,26 @@ tr:hover td{ background:#FBFAF6; }
       </div>
       <div class="form-row">
         <div class="field"><label>Passport Expiry</label><input type="date" id="s_passport"></div>
-        <div class="field"><label>Last Air Ticket Date <span class="hint">(টিকেট সাইকেল হিসাবের ভিত্তি)</span></label><input type="date" id="s_lastTicket"></div>
+        <div class="field"><label>Last Air Ticket Date <span class="hint">(basis for ticket cycle calculation)</span></label><input type="date" id="s_lastTicket"></div>
       </div>
       <div class="field"><label>Remarks</label><textarea id="s_remark" rows="2"></textarea></div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeModal('staffModalOverlay')">বাতিল</button>
-      <button class="btn btn-gold" onclick="saveStaff()">সংরক্ষণ করুন</button>
+      <button class="btn btn-ghost" onclick="closeModal('staffModalOverlay')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveStaff()">Save</button>
     </div>
   </div>
 </div>
 
 <!-- ===================== MODAL: LEAVE ===================== -->
-<div class="overlay" id="leaveModalOverlay">
-  <div class="modal wide">
-    <div class="modal-head"><h3 id="leaveModalTitle">নতুন লিভ এন্ট্রি</h3><button class="modal-close" onclick="closeModal('leaveModalOverlay')">✕</button></div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="field"><label>স্টাফ বেছে নিন *</label>
-          <select id="lv_tcNo" onchange="refreshLeaveModalBalance()"><option value="">— বেছে নিন —</option></select>
-        </div>
-        <div class="field"><label>Leave Type *</label>
-          <select id="lv_type">
-            <option>Annual</option><option>Local</option><option>Emergency</option>
-            <option>Ramadan Leave</option><option>Hajj Leave</option><option>National Day</option>
-            <option>Foundation Day</option><option>Marriage Leave</option><option>Unpaid Leave</option><option>Study Leave</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row c3">
-        <div class="field"><label>From *</label><input type="date" id="lv_from" onchange="calcLeaveDays()"></div>
-        <div class="field"><label>To *</label><input type="date" id="lv_to" onchange="calcLeaveDays()"></div>
-        <div class="field"><label>Total Days</label><input type="number" id="lv_days" readonly style="background:#F0ECE1;"></div>
-      </div>
-      <div class="form-row">
-        <div class="field"><label>Ticket Type</label>
-          <select id="lv_ticket"><option value="None">None</option><option value="Company Ticket">Company Ticket</option><option value="Self Ticket">Self Ticket</option></select>
-        </div>
-        <div class="field" id="lv_statusRow"><label>Status</label>
-          <select id="lv_status"><option value="Reserved">Reserved (ভবিষ্যতের জন্য বুক করা)</option><option value="On Leave">On Leave (এখনই যাচ্ছে)</option></select>
-        </div>
-      </div>
-      <div class="field"><label>Remark</label><input id="lv_remark" placeholder="যেমন Dammam to Dhaka"></div>
-      <div class="note-box" id="lv_balanceNote">একজন স্টাফ বেছে নিন — ব্যালেন্স দেখানো হবে</div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeModal('leaveModalOverlay')">বাতিল</button>
-      <button class="btn btn-gold" onclick="saveLeave()">সংরক্ষণ করুন</button>
-    </div>
-  </div>
-</div>
-
 <!-- ===================== MODAL: STAFF DETAIL ===================== -->
 <div class="overlay" id="detailModalOverlay">
   <div class="modal wide">
-    <div class="modal-head"><h3 id="detailModalTitle">স্টাফ বিবরণ</h3><button class="modal-close" onclick="closeModal('detailModalOverlay')">✕</button></div>
+    <div class="modal-head"><h3 id="detailModalTitle">Staff Details</h3><button class="modal-close" onclick="closeModal('detailModalOverlay')">✕</button></div>
     <div class="modal-body" id="detailModalBody"></div>
     <div class="modal-foot">
-      <button class="btn btn-outline" onclick="printLeaveForm()">🖨️ Leave Request প্রিন্ট করুন</button>
-      <button class="btn btn-ghost" onclick="closeModal('detailModalOverlay')">বন্ধ করুন</button>
+      <button class="btn btn-outline" onclick="printLeaveForm()">🖨️ Print Leave Request</button>
+      <button class="btn btn-ghost" onclick="closeModal('detailModalOverlay')">Close</button>
     </div>
   </div>
 </div>
@@ -761,18 +767,18 @@ tr:hover td{ background:#FBFAF6; }
 <!-- ===================== MODAL: CLOSE LEAVE (return) ===================== -->
 <div class="overlay" id="closeModalOverlay">
   <div class="modal">
-    <div class="modal-head"><h3>লিভ ক্লোজ করুন (Return)</h3><button class="modal-close" onclick="closeModal('closeModalOverlay')">✕</button></div>
+    <div class="modal-head"><h3>Close Leave (Return)</h3><button class="modal-close" onclick="closeModal('closeModalOverlay')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="cl_leaveId">
       <div id="cl_summary" class="note-box" style="margin-bottom:16px;"></div>
-      <div class="field"><label>প্রকৃত রিটার্ন তারিখ *</label><input type="date" id="cl_returnDate"></div>
+      <div class="field"><label>Actual Return Date *</label><input type="date" id="cl_returnDate"></div>
       <div class="field" id="cl_ticketUsedWrap" style="display:none;">
-        <label><input type="checkbox" id="cl_ticketUsed" checked> এয়ার টিকেট ব্যবহার হয়েছে — টিকেট সাইকেল রিসেট করুন</label>
+        <label><input type="checkbox" id="cl_ticketUsed" checked> Air ticket was used, reset the ticket cycle</label>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeModal('closeModalOverlay')">বাতিল</button>
-      <button class="btn btn-gold" onclick="confirmCloseLeave()">লিভ ক্লোজ করুন</button>
+      <button class="btn btn-ghost" onclick="closeModal('closeModalOverlay')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmCloseLeave()">Close Leave</button>
     </div>
   </div>
 </div>
@@ -793,9 +799,9 @@ tr:hover td{ background:#FBFAF6; }
 /* =========================================================================
    FIREBASE CONFIG
    ------------------------------------------------------------------------
-   এখানে আপনার নিজের Firebase প্রজেক্টের কনফিগারেশন বসান।
+   Insert your own Firebase project configuration here.
    Firebase Console → Project settings → General → Your apps → SDK setup
-   Firestore ও Authentication (Email/Password) চালু রাখতে হবে।
+   Firestore and Authentication (Email/Password) must be enabled.
    ========================================================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyDI1zX3hDRTRbs8Hls7OxP6U0_Le_IEbQw",
@@ -818,8 +824,16 @@ const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
    CONSTANTS & STATE
    ========================================================================= */
 const MS_DAY = 86400000;
-const LOGIN_DOMAIN = "gulfpalace.local"; // TC number "3034" -> internal login email "3034@gulfpalace.local"
+const LOGIN_DOMAIN = "gulfpalace.local"; // Username "3034" -> internal login email "3034@gulfpalace.local"
 let CFG = { rateBeforeFive: 21, rateAfterFive: 30, fiveYearDays: 1825, ticketCycleYears: 2 };
+
+const LEAVE_CATEGORIES = ["Emergency", "Local", "Annual Leave"];
+const LEAVE_TYPES = [
+  "Annual Leave","Competry Leave","Death Leave","Eid Al Adha Leave","Eid Al Fitr Leave",
+  "Employee of the Year","Foundation Day","Hajj Leave","Marriage Leave","Maternity Leave",
+  "New Baby Born Leave","National Day","Sick Leave","Study Leave","Local Leave","Emergency Leave"
+];
+let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
 
 let staffList = [];      // cached from Firestore
 let leaveList = [];      // cached from Firestore
@@ -850,7 +864,7 @@ auth.onAuthStateChanged(user=>{
   if(user){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('loadingScreen').style.display='flex';
-    document.getElementById('loadingScreen').querySelector('div:last-child').textContent = 'প্রোফাইল লোড হচ্ছে…';
+    document.getElementById('loadingScreen').querySelector('div:last-child').textContent = 'Loading profile…';
     roleApplied = false;
     initListeners();
   } else {
@@ -868,12 +882,12 @@ function doLogin(){
   const pass = document.getElementById('loginPassword').value;
   const errBox = document.getElementById('loginError');
   errBox.style.display='none';
-  if(!tcNo || !pass){ errBox.textContent='TC নম্বর ও পাসওয়ার্ড দিন'; errBox.style.display='block'; return; }
+  if(!tcNo || !pass){ errBox.textContent='Please enter your username and password'; errBox.style.display='block'; return; }
   auth.signInWithEmailAndPassword(tcToLoginEmail(tcNo), pass).catch(err=>{
-    let msg = 'লগইন ব্যর্থ';
-    if(err.code==='auth/user-not-found' || err.code==='auth/invalid-credential') msg='এই TC নম্বরের কোনো লগইন পাওয়া যায়নি। Admin-কে বলুন আপনার জন্য অ্যাকাউন্ট তৈরি করে দিতে।';
-    else if(err.code==='auth/wrong-password') msg='পাসওয়ার্ড ভুল হয়েছে';
-    else msg = 'লগইন ব্যর্থ: ' + (err.message||err.code);
+    let msg = 'Sign in failed';
+    if(err.code==='auth/user-not-found' || err.code==='auth/invalid-credential') msg='No account found for this username. Please ask your Admin to create one for you.';
+    else if(err.code==='auth/wrong-password') msg='Incorrect password';
+    else msg = 'Sign in failed: ' + (err.message||err.code);
     errBox.textContent = msg;
     errBox.style.display='block';
   });
@@ -903,7 +917,7 @@ function applyRoleUI(){
   document.getElementById('sideUserRole').textContent = isAdmin ? 'Administrator' : 'Staff · TC ' + currentUser.tcNo;
   document.getElementById('cfgUserEmail').textContent = auth.currentUser.email;
   document.getElementById('cfgProjectId').textContent = firebaseConfig.projectId;
-  document.getElementById('navDashboardLabel').textContent = isAdmin ? 'Dashboard' : 'আমার লিভ';
+  document.getElementById('navDashboardLabel').textContent = isAdmin ? 'Dashboard' : 'My Leave';
   if(!roleApplied){ showView('dashboard'); } // only force-navigate right after login, not on every data refresh
   roleApplied = true;
 }
@@ -934,12 +948,12 @@ function initListeners(){
     if(staffList.length===0){ seedInitialStaff(); }
     resolveCurrentUser();
     refreshAll();
-  }, err=> toast('Staff লোড ব্যর্থ: '+err.message, 'err'));
+  }, err=> toast('Failed to load staff: '+err.message, 'err'));
 
   unsubLeave = db.collection('leaves').orderBy('fromDate','desc').onSnapshot(snap=>{
     leaveList = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     refreshAll();
-  }, err=> toast('Leave লোড ব্যর্থ: '+err.message, 'err'));
+  }, err=> toast('Failed to load leaves: '+err.message, 'err'));
 
   unsubConfig = db.collection('settings').doc('appConfig').onSnapshot(doc=>{
     if(doc.exists){
@@ -968,7 +982,7 @@ async function seedInitialStaff(){
     });
   });
   await batch.commit();
-  toast('প্রাথমিক ৪ জন স্টাফের ডেটা যোগ করা হয়েছে', 'ok');
+  toast('Initial staff data added', 'ok');
 }
 
 function refreshAll(){
@@ -978,6 +992,7 @@ function refreshAll(){
   renderStaffGrid();
   renderContracts();
   renderLeaveTable();
+  renderLeaveApproved();
   renderApprovals();
   renderTicketCards();
   renderStaffSelects();
@@ -990,6 +1005,7 @@ function refreshAll(){
    NAVIGATION
    ========================================================================= */
 const ADMIN_ONLY_VIEWS = ['staff','contracts','approvals','localLeave','tickets','indemnity','settings'];
+
 function showView(name){
   if(currentUser && currentUser.role!=='admin' && ADMIN_ONLY_VIEWS.includes(name)) name = 'dashboard';
   document.querySelectorAll('.view').forEach(v=>v.style.display='none');
@@ -997,6 +1013,9 @@ function showView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const navEl = document.querySelector('.nav-item[data-view="'+name+'"]');
   if(navEl) navEl.classList.add('active');
+  if(name==='leaveRequest') openLeaveRequestPage();
+  if(name==='leaveDetails') renderLeaveTable();
+  if(name==='leaveApproved') renderLeaveApproved();
 }
 
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -1086,7 +1105,7 @@ function renderDashboard(){
   // balance list
   const balBox = document.getElementById('dashBalanceList');
   if(staffList.length===0){
-    balBox.innerHTML = '<div class="empty"><b>কোনো স্টাফ নেই</b>Staff Directory থেকে যোগ করুন</div>';
+    balBox.innerHTML = '<div class="empty"><b>No staff yet</b>Add staff from Staff Directory</div>';
   } else {
     balBox.innerHTML = staffList.filter(s=>s.status!=='Resigned').map(s=>{
       const b = leaveBalance(s);
@@ -1107,7 +1126,7 @@ function renderDashboard(){
   const actBox = document.getElementById('dashRecentActivity');
   const recent = [...leaveList].sort((a,b)=> (b.requestedAt?.seconds||0) - (a.requestedAt?.seconds||0)).slice(0,8);
   if(recent.length===0){
-    actBox.innerHTML = '<div class="empty"><b>কোনো কার্যক্রম নেই</b>নতুন লিভ এন্ট্রি করুন</div>';
+    actBox.innerHTML = '<div class="empty"><b>No activity yet</b>Create a new leave entry</div>';
   } else {
     actBox.innerHTML = recent.map(l=>`
       <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border-soft); font-size:13px;">
@@ -1129,44 +1148,141 @@ function renderMyLeaveHome(){
   if(!currentUser || currentUser.role==='admin') return;
   const s = staffList.find(x=>x.tcNo===currentUser.tcNo);
   if(!s) return;
-  document.getElementById('dashTitle').textContent = 'আসসালামু আলাইকুম, ' + s.name.split(' ')[0];
-  document.getElementById('dashSub').textContent = s.position + ' · TC ' + s.tcNo + ' · ' + s.department;
+  document.getElementById('dashTitle').textContent = 'Welcome, ' + s.name.split(' ')[0];
+  document.getElementById('dashSub').textContent = s.position + ' · ' + s.department;
 
   const b = leaveBalance(s);
   const pct = Math.max(0, Math.min(100, (b.balance/(b.accrued||1))*100));
   const color = b.balance<10 ? 'var(--danger)' : b.balance<30 ? 'var(--warning)' : 'var(--success)';
   document.getElementById('myBalanceRing').style.background = `conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg)`;
   document.getElementById('myBalanceVal').textContent = b.balance.toFixed(0);
-  document.getElementById('myBalanceSub').textContent = `Accrued ${b.accrued.toFixed(1)} · Taken ${b.taken.toFixed(0)} দিন`;
+  document.getElementById('myBalanceSub').textContent = `Accrued ${b.accrued.toFixed(1)} · Taken ${b.taken.toFixed(0)} days`;
 
   const ti = ticketInfo(s);
   const tpct = Math.max(0, Math.min(100, 100-(ti.daysLeft/(CFG.ticketCycleYears*365))*100));
   const tcolor = ti.due?'var(--danger)': ti.daysLeft<90?'var(--warning)':'var(--success)';
   document.getElementById('myTicketRing').style.background = `conic-gradient(${tcolor} ${tpct*3.6}deg, var(--border-soft) 0deg)`;
   document.getElementById('myTicketVal').textContent = ti.due?'DUE':ti.daysLeft+'d';
-  document.getElementById('myTicketSub').textContent = ti.due ? 'আপনার টিকেট এখনই প্রাপ্য' : 'পরবর্তী: ' + fmtDate(ti.nextDue);
+  document.getElementById('myTicketSub').textContent = ti.due ? 'Your ticket is due now' : 'Next: ' + fmtDate(ti.nextDue);
 
   const hist = leaveList.filter(l=>l.tcNo===currentUser.tcNo).sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
   const tbody = document.getElementById('myLeaveTbody');
   tbody.innerHTML = hist.length ? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('')
-    : '<tr><td colspan="5" style="text-align:center; color:var(--slate); padding:24px;">এখনো কোনো লিভ রেকর্ড নেই</td></tr>';
+    : '<tr><td colspan="5" style="text-align:center; color:var(--slate); padding:24px;">No leave records yet</td></tr>';
 }
 
-function openStaffRequestModal(){
+/* =========================================================================
+   LEAVE REQUEST — Category + Matrix (multi-row) entry
+   ========================================================================= */
+function leaveTypeOptionsHTML(selected){
+  return LEAVE_TYPES.map(t=>`<option value="${t}" ${t===selected?'selected':''}>${t}</option>`).join('');
+}
+
+function matrixRowHTML(rowId){
+  return `<div class="card card-pad matrix-row" data-row-id="${rowId}" style="margin-bottom:12px; background:var(--cream);">
+    <div class="form-row c3">
+      <div class="field"><label>Leave Type *</label>
+        <select class="mr-type" onchange="">
+          <option value="">Select Leave Type</option>
+          ${leaveTypeOptionsHTML()}
+        </select>
+      </div>
+      <div class="field"><label>Start Date *</label><input type="date" class="mr-start" oninput="updateRowEndDate('${rowId}')"></div>
+      <div class="field"><label>Days *</label><input type="number" min="1" class="mr-days" placeholder="Enter Days" oninput="updateRowEndDate('${rowId}')"></div>
+    </div>
+    <div class="form-row" style="align-items:flex-end;">
+      <div class="field"><label>End Date</label><input type="text" class="mr-end" readonly placeholder="Automatically Calculated" style="background:#F0ECE1;"></div>
+      <div class="field" style="display:flex; align-items:flex-end;"><button type="button" class="btn btn-danger btn-sm" onclick="removeMatrixRow('${rowId}')">Delete</button></div>
+    </div>
+  </div>`;
+}
+
+function addMatrixRow(){
+  matrixRowSeq++;
+  const rowId = 'row' + matrixRowSeq;
+  document.getElementById('matrixRowsContainer').insertAdjacentHTML('beforeend', matrixRowHTML(rowId));
+}
+
+function removeMatrixRow(rowId){
+  const container = document.getElementById('matrixRowsContainer');
+  const rows = container.querySelectorAll('.matrix-row');
+  if(rows.length<=1){ toast('At least one leave entry is required', 'err'); return; }
+  const el = container.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
+  if(el) el.remove();
+}
+
+function updateRowEndDate(rowId){
+  const row = document.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
+  if(!row) return;
+  const start = row.querySelector('.mr-start').value;
+  const days = Number(row.querySelector('.mr-days').value);
+  const endInput = row.querySelector('.mr-end');
+  if(start && days>0){
+    const endDate = new Date(start);
+    endDate.setDate(endDate.getDate() + (days-1));
+    const iso = endDate.toISOString().slice(0,10);
+    const [y,m,d] = iso.split('-');
+    endInput.value = `${d}/${m}/${y}`;
+    endInput.dataset.iso = iso;
+  } else {
+    endInput.value = '';
+    endInput.dataset.iso = '';
+  }
+}
+
+function openLeaveRequestPage(){
+  document.getElementById('lr_category').value = '';
+  const staffSel = document.getElementById('lr_tcNo');
+  if(currentUser && currentUser.role!=='admin'){
+    // staff can only request for themselves
+    staffSel.innerHTML = `<option value="${currentUser.tcNo}">${currentUser.name}</option>`;
+    staffSel.value = currentUser.tcNo;
+  }
+  document.getElementById('matrixRowsContainer').innerHTML = '';
+  matrixRowSeq = 0;
+  addMatrixRow();
+}
+
+async function submitLeaveRequest(){
   if(!currentUser) return;
-  document.getElementById('lv_tcNo').value = currentUser.tcNo;
-  document.getElementById('lv_type').value='Annual';
-  document.getElementById('lv_from').value='';
-  document.getElementById('lv_to').value='';
-  document.getElementById('lv_days').value='';
-  document.getElementById('lv_ticket').value='None';
-  document.getElementById('lv_remark').value='';
-  refreshLeaveModalBalance();
-  // lock the staff selector and status field for self-service requests
-  document.getElementById('lv_tcNo').disabled = true;
-  document.getElementById('lv_statusRow').style.display='none';
-  document.getElementById('leaveModalTitle').textContent = 'লিভের জন্য আবেদন করুন';
-  openModalEl('leaveModalOverlay');
+  const category = document.getElementById('lr_category').value;
+  const isAdmin = currentUser.role==='admin';
+  const tcNo = isAdmin ? document.getElementById('lr_tcNo').value : currentUser.tcNo;
+  if(!category){ toast('Please select a Leave Category', 'err'); return; }
+  if(!tcNo){ toast('Please select a Staff', 'err'); return; }
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  if(!s){ toast('Staff not found', 'err'); return; }
+
+  const rows = Array.from(document.querySelectorAll('#matrixRowsContainer .matrix-row'));
+  if(rows.length===0){ toast('Please add at least one leave entry', 'err'); return; }
+
+  const entries = [];
+  for(const row of rows){
+    const type = row.querySelector('.mr-type').value;
+    const start = row.querySelector('.mr-start').value;
+    const days = Number(row.querySelector('.mr-days').value);
+    const endIso = row.querySelector('.mr-end').dataset.iso;
+    if(!type || !start || !days || days<=0){ toast('Please fill Leave Type, Start Date and Days for every entry', 'err'); return; }
+    entries.push({ type, fromDate: start, toDate: endIso, days });
+  }
+
+  try{
+    const batch = db.batch();
+    entries.forEach(e=>{
+      const ref = db.collection('leaves').doc();
+      batch.set(ref, {
+        tcNo, name: s.name, category, type: e.type,
+        fromDate: e.fromDate, toDate: e.toDate, days: e.days,
+        ticketType: 'None',
+        status: isAdmin ? 'Reserved' : 'Pending',
+        remark: '', year: new Date(e.fromDate).getFullYear(),
+        requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    toast(isAdmin ? 'Leave request saved' : 'Your leave request has been submitted for approval', 'ok');
+    showView('leaveDetails');
+  }catch(err){ toast('Failed to save: '+err.message, 'err'); }
 }
 
 function renderApprovals(){
@@ -1176,7 +1292,7 @@ function renderApprovals(){
   if(pending.length>0){ badge.textContent = pending.length; badge.style.display='inline-flex'; } else { badge.style.display='none'; }
 
   const tbody = document.getElementById('approvalsTbody');
-  if(pending.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">কোনো Pending রিকোয়েস্ট নেই</td></tr>'; return; }
+  if(pending.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No pending requests</td></tr>'; return; }
   tbody.innerHTML = pending.map(l=>`<tr>
     <td>${l.tcNo}</td><td>${l.name}</td><td>${l.type}</td>
     <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
@@ -1186,13 +1302,13 @@ function renderApprovals(){
 }
 
 async function approveLeave(id){
-  try{ await db.collection('leaves').doc(id).update({ status:'Reserved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('অনুমোদন করা হয়েছে','ok'); }
-  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+  try{ await db.collection('leaves').doc(id).update({ status:'Reserved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('Approved','ok'); }
+  catch(err){ toast('Failed: '+err.message,'err'); }
 }
 async function rejectLeave(id){
-  if(!confirm('এই লিভ রিকোয়েস্ট বাতিল করবেন?')) return;
-  try{ await db.collection('leaves').doc(id).update({ status:'Rejected' }); toast('বাতিল করা হয়েছে','ok'); }
-  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+  if(!confirm('Reject this leave request?')) return;
+  try{ await db.collection('leaves').doc(id).update({ status:'Rejected' }); toast('Cancelled','ok'); }
+  catch(err){ toast('Failed: '+err.message,'err'); }
 }
 
 /* =========================================================================
@@ -1206,7 +1322,7 @@ function renderStaffGrid(){
 
   const grid = document.getElementById('staffGrid');
   if(list.length===0){
-    grid.innerHTML = '<div class="card empty" style="grid-column:1/-1;"><b>কোনো স্টাফ পাওয়া যায়নি</b>খোঁজ পরিবর্তন করুন বা নতুন স্টাফ যোগ করুন</div>';
+    grid.innerHTML = '<div class="card empty" style="grid-column:1/-1;"><b>No staff found</b>Change your search or add a new staff member</div>';
     return;
   }
   grid.innerHTML = list.map(s=>{
@@ -1229,16 +1345,16 @@ function renderStaffGrid(){
         <div>Ticket ${ti.due? '<span style="color:var(--danger); font-weight:700;">Due now</span>' : '<b>'+fmtDate(ti.nextDue)+'</b>'}</div>
       </div>
       <div class="staff-actions">
-        <button class="btn btn-outline btn-sm" onclick="openStaffDetail('${s.tcNo}')">বিস্তারিত</button>
-        <button class="btn btn-outline btn-sm" onclick="openStaffModal('${s.tcNo}')">সম্পাদনা</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteStaff('${s.tcNo}')">মুছুন</button>
+        <button class="btn btn-outline btn-sm" onclick="openStaffDetail('${s.tcNo}')">Details</button>
+        <button class="btn btn-outline btn-sm" onclick="openStaffModal('${s.tcNo}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStaff('${s.tcNo}')">Delete</button>
       </div>
     </div>`;
   }).join('');
 }
 
 function openStaffModal(tcNo){
-  document.getElementById('staffModalTitle').textContent = tcNo? 'স্টাফ সম্পাদনা করুন' : 'নতুন স্টাফ যোগ করুন';
+  document.getElementById('staffModalTitle').textContent = tcNo? 'Edit Staff' : 'Add New Staff';
   document.getElementById('staffDocId').value = tcNo||'';
   const s = tcNo? staffList.find(x=>x.tcNo===tcNo) : null;
   document.getElementById('s_tcNo').value = s?.tcNo||'';
@@ -1259,7 +1375,7 @@ function openStaffModal(tcNo){
   document.getElementById('s_remark').value = s?.remark||'';
   document.getElementById('s_role').value = s?.role||'staff';
   document.getElementById('s_newPassword').value = '';
-  document.getElementById('s_loginStatus').innerHTML = 'Username হবে স্টাফের TC নম্বর (উদাহরণ: TC 3034 → Username <b>3034</b>)।';
+  document.getElementById('s_loginStatus').innerHTML = 'Username will be the staff\'s TC number (example: TC 3034 -> Username <b>3034</b>).';
   openModalEl('staffModalOverlay');
 }
 
@@ -1267,23 +1383,23 @@ async function handleCreateStaffLogin(){
   const tcNo = document.getElementById('s_tcNo').value.trim();
   const pass = document.getElementById('s_newPassword').value;
   const statusBox = document.getElementById('s_loginStatus');
-  if(!tcNo){ toast('আগে TC No দিন', 'err'); return; }
-  if(!pass || pass.length<6){ toast('কমপক্ষে ৬ ক্যারেক্টারের পাসওয়ার্ড দিন', 'err'); return; }
+  if(!tcNo){ toast('Please enter TC No first', 'err'); return; }
+  if(!pass || pass.length<6){ toast('Password must be at least 6 characters', 'err'); return; }
   const btn = document.getElementById('s_createLoginBtn');
-  btn.disabled = true; btn.textContent = 'তৈরি হচ্ছে…';
+  btn.disabled = true; btn.textContent = 'Creating…';
   const result = await createStaffLogin(tcNo, pass);
-  btn.disabled = false; btn.textContent = 'লগইন তৈরি করুন';
+  btn.disabled = false; btn.textContent = 'Create Login';
   if(result.ok){
-    statusBox.innerHTML = `✅ লগইন তৈরি হয়েছে — Username: <b>${tcNo}</b>, Password যা দিয়েছেন সেটাই।`;
-    toast('স্টাফ লগইন তৈরি করা হয়েছে', 'ok');
+    statusBox.innerHTML = `✅ Login created — Username: <b>${tcNo}</b>, password is what you entered.`;
+    toast('Staff login created', 'ok');
     document.getElementById('s_newPassword').value='';
   } else {
     if((result.error||'').toLowerCase().includes('email-already-in-use') || (result.error||'').toLowerCase().includes('already')){
-      statusBox.innerHTML = `⚠️ TC <b>${tcNo}</b>-এর জন্য লগইন আগে থেকেই আছে। পরিবর্তন করতে Firebase Console → Authentication → Users থেকে আগেরটা Delete করুন।`;
+      statusBox.innerHTML = `⚠️ A login already exists for TC <b>${tcNo}</b>. To change it, delete the old one from Firebase Console -> Authentication -> Users.`;
     } else {
-      statusBox.innerHTML = `❌ ব্যর্থ: ${result.error}`;
+      statusBox.innerHTML = `❌ Failed: ${result.error}`;
     }
-    toast('লগইন তৈরি ব্যর্থ', 'err');
+    toast('Failed to create login', 'err');
   }
 }
 
@@ -1292,7 +1408,7 @@ async function saveStaff(){
   const name = document.getElementById('s_name').value.trim();
   const position = document.getElementById('s_position').value.trim();
   const joining = document.getElementById('s_joining').value;
-  if(!tcNo || !name || !position || !joining){ toast('TC No, Name, Position, Joining Date আবশ্যক', 'err'); return; }
+  if(!tcNo || !name || !position || !joining){ toast('TC No, Name, Position, and Joining Date are required', 'err'); return; }
 
   const data = {
     tcNo, name, position,
@@ -1313,16 +1429,16 @@ async function saveStaff(){
   };
   try{
     await db.collection('staff').doc(tcNo).set(data, {merge:true});
-    toast('স্টাফ সংরক্ষণ করা হয়েছে', 'ok');
+    toast('Staff saved', 'ok');
     closeModal('staffModalOverlay');
     document.getElementById('s_tcNo').disabled = false;
-  }catch(err){ toast('সংরক্ষণ ব্যর্থ: '+err.message, 'err'); }
+  }catch(err){ toast('Save failed: '+err.message, 'err'); }
 }
 
 async function deleteStaff(tcNo){
-  if(!confirm('এই স্টাফের সব তথ্য মুছে ফেলা হবে। নিশ্চিত?')) return;
-  try{ await db.collection('staff').doc(tcNo).delete(); toast('স্টাফ মুছে ফেলা হয়েছে','ok'); }
-  catch(err){ toast('মুছতে ব্যর্থ: '+err.message,'err'); }
+  if(!confirm('This will delete all of this staff\'s data. Are you sure?')) return;
+  try{ await db.collection('staff').doc(tcNo).delete(); toast('Staff deleted','ok'); }
+  catch(err){ toast('Delete failed: '+err.message,'err'); }
 }
 
 function openStaffDetail(tcNo){
@@ -1353,10 +1469,10 @@ function openStaffDetail(tcNo){
         <div class="k-v"><span>Salary (Basic+Food+House)</span><span>${(s.salary+s.food+s.house).toFixed(0)} SAR</span></div>
       </div>
     </div>
-    <div class="section-title">লিভ ইতিহাস (${hist.length})</div>
+    <div class="section-title">Leave History (${hist.length})</div>
     <div class="tbl-wrap" style="max-height:260px; overflow-y:auto;">
     <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
-    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center; color:var(--slate);">কোনো রেকর্ড নেই</td></tr>'}</tbody>
+    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center; color:var(--slate);">No records</td></tr>'}</tbody>
     </table>
     </div>
   `;
@@ -1369,7 +1485,7 @@ function openStaffDetail(tcNo){
    ========================================================================= */
 function renderContracts(){
   const tbody = document.getElementById('contractsTbody');
-  if(staffList.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">কোনো স্টাফ নেই</td></tr>'; return; }
+  if(staffList.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No staff</td></tr>'; return; }
   tbody.innerHTML = staffList.map(s=>{
     const b = leaveBalance(s);
     const ti = ticketInfo(s);
@@ -1394,135 +1510,95 @@ function renderContracts(){
 /* =========================================================================
    LEAVE RECORDS VIEW
    ========================================================================= */
-function setLeaveTab(tab){
-  currentLeaveTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector('.tab-btn[data-tab="'+tab+'"]').classList.add('active');
-  renderLeaveTable();
-}
-
 function renderLeaveTable(){
+  if(!currentUser) return;
   const q = (document.getElementById('leaveSearch')?.value||'').toLowerCase();
   const typeF = document.getElementById('leaveTypeFilter')?.value||'';
 
   // populate type filter once
   const typeSel = document.getElementById('leaveTypeFilter');
   if(typeSel.options.length<=1){
-    const types = ['Annual','Local','Emergency','Ramadan Leave','Hajj Leave','National Day','Foundation Day','Marriage Leave','Unpaid Leave','Study Leave'];
-    types.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
+    LEAVE_TYPES.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
   }
 
   let list = [...leaveList];
-  if(currentLeaveTab!=='all') list = list.filter(l=>l.status===currentLeaveTab);
+  if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
   if(typeF) list = list.filter(l=>l.type===typeF);
-  if(q) list = list.filter(l=> l.name.toLowerCase().includes(q) || l.tcNo.includes(q));
+  if(q) list = list.filter(l=> l.name.toLowerCase().includes(q));
 
   const tbody = document.getElementById('leaveTbody');
-  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--slate); padding:30px;">কোনো রেকর্ড নেই</td></tr>'; return; }
+  if(!tbody) return;
+  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No records found</td></tr>'; return; }
 
+  const isAdmin = currentUser.role==='admin';
   tbody.innerHTML = list.map(l=>{
     let actions = '';
-    if(l.status==='Pending'){
-      actions = `<button class="btn btn-gold btn-sm" onclick="approveLeave('${l.id}')">Approve</button> <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button>`;
-    } else if(l.status==='Reserved'){
-      actions = `<button class="btn btn-outline btn-sm" onclick="startLeave('${l.id}')">Start</button> <button class="btn btn-ghost btn-sm" onclick="cancelLeave('${l.id}')">Cancel</button>`;
-    } else if(l.status==='On Leave'){
-      actions = `<button class="btn btn-gold btn-sm" onclick="openCloseModal('${l.id}')">Close / Return</button>`;
+    if(isAdmin){
+      if(l.status==='Pending'){
+        actions = `<button class="btn btn-gold btn-sm" onclick="approveLeave('${l.id}')">Approve</button> <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button>`;
+      } else if(l.status==='Reserved'){
+        actions = `<button class="btn btn-outline btn-sm" onclick="startLeave('${l.id}')">Start</button> <button class="btn btn-ghost btn-sm" onclick="cancelLeave('${l.id}')">Cancel</button>`;
+      } else if(l.status==='On Leave'){
+        actions = `<button class="btn btn-gold btn-sm" onclick="openCloseModal('${l.id}')">Close / Return</button>`;
+      } else {
+        actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
+      }
     } else {
       actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
     }
     return `<tr>
-      <td>${l.tcNo}</td><td>${l.name}</td><td>${l.type}</td>
+      <td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
       <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
-      <td>${l.ticketType&&l.ticketType!=='None'?`<span class="badge badge-info">${l.ticketType}</span>`:'—'}</td>
       <td>${statusBadge(l.status)}</td>
       <td>${actions}</td>
     </tr>`;
   }).join('');
 }
 
+function renderLeaveApproved(){
+  if(!currentUser) return;
+  const tbody = document.getElementById('leaveApprovedTbody');
+  if(!tbody) return;
+  const approvedStatuses = ['Reserved','On Leave','Closed'];
+  let list = leaveList.filter(l=>approvedStatuses.includes(l.status));
+  if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
+  list = [...list].sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
+
+  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:30px;">No approved leave records yet</td></tr>'; return; }
+  tbody.innerHTML = list.map(l=>`<tr>
+      <td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
+      <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
+      <td>${statusBadge(l.status)}</td>
+    </tr>`).join('');
+}
+
 function renderStaffSelects(){
   const activeStaff = staffList.filter(s=>s.status!=='Resigned');
-  ['lv_tcNo','indStaffSelect'].forEach(id=>{
+  ['indStaffSelect'].forEach(id=>{
     const sel = document.getElementById(id);
     const currentVal = sel.value;
-    const placeholder = id==='lv_tcNo' ? '<option value="">— বেছে নিন —</option>' : '<option value="">— manual entry —</option>';
-    sel.innerHTML = placeholder + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
+    sel.innerHTML = '<option value="">— manual entry —</option>' + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
     sel.value = currentVal;
   });
-}
-
-/* ---- add / start / close / cancel leave ---- */
-function openLeaveModal(){
-  document.getElementById('lv_tcNo').value='';
-  document.getElementById('lv_tcNo').disabled = false;
-  document.getElementById('lv_type').value='Annual';
-  document.getElementById('lv_from').value='';
-  document.getElementById('lv_to').value='';
-  document.getElementById('lv_days').value='';
-  document.getElementById('lv_ticket').value='None';
-  document.getElementById('lv_status').value='Reserved';
-  document.getElementById('lv_remark').value='';
-  document.getElementById('lv_balanceNote').textContent='একজন স্টাফ বেছে নিন — ব্যালেন্স দেখানো হবে';
-  document.getElementById('lv_statusRow').style.display='';
-  document.getElementById('leaveModalTitle').textContent = 'নতুন লিভ এন্ট্রি';
-  openModalEl('leaveModalOverlay');
-}
-
-function calcLeaveDays(){
-  const f = document.getElementById('lv_from').value, t = document.getElementById('lv_to').value;
-  if(f && t){
-    const d = daysBetween(f,t)+1;
-    document.getElementById('lv_days').value = d>0? d : '';
+  // Leave Request staff picker (admin only — staff members request only for themselves)
+  const lrSel = document.getElementById('lr_tcNo');
+  if(lrSel && currentUser && currentUser.role==='admin'){
+    const currentVal = lrSel.value;
+    lrSel.innerHTML = '<option value="">Select Staff</option>' + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
+    lrSel.value = currentVal;
   }
 }
 
-function refreshLeaveModalBalance(){
-  const tcNo = document.getElementById('lv_tcNo').value;
-  const box = document.getElementById('lv_balanceNote');
-  if(!tcNo){ box.textContent='একজন স্টাফ বেছে নিন — ব্যালেন্স দেখানো হবে'; return; }
-  const s = staffList.find(x=>x.tcNo===tcNo);
-  const b = leaveBalance(s);
-  const ti = ticketInfo(s);
-  box.innerHTML = `<b>${s.name}</b> — বর্তমান Annual Balance: <b>${b.balance.toFixed(2)} দিন</b> · পরবর্তী Air Ticket: <b>${ti.due?'Due Now':fmtDate(ti.nextDue)}</b>`;
-}
-
-async function saveLeave(){
-  const isSelfService = currentUser.role!=='admin';
-  const tcNo = document.getElementById('lv_tcNo').value;
-  const type = document.getElementById('lv_type').value;
-  const from = document.getElementById('lv_from').value;
-  const to = document.getElementById('lv_to').value;
-  const days = Number(document.getElementById('lv_days').value);
-  if(!tcNo || !from || !to || !days || days<=0){ toast('স্টাফ, তারিখ ও দিন সংখ্যা ঠিকমতো দিন', 'err'); return; }
-  if(isSelfService && tcNo!==currentUser.tcNo){ toast('আপনি শুধু নিজের জন্য আবেদন করতে পারবেন','err'); return; }
-  const s = staffList.find(x=>x.tcNo===tcNo);
-
-  const data = {
-    tcNo, name:s.name, type,
-    fromDate:from, toDate:to, days,
-    ticketType: document.getElementById('lv_ticket').value,
-    status: isSelfService ? 'Pending' : document.getElementById('lv_status').value,
-    remark: document.getElementById('lv_remark').value.trim(),
-    year: new Date(from).getFullYear(),
-    requestedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  try{
-    await db.collection('leaves').add(data);
-    toast(isSelfService ? 'আপনার আবেদন Admin-এর কাছে পাঠানো হয়েছে' : 'লিভ এন্ট্রি সংরক্ষণ করা হয়েছে', 'ok');
-    closeModal('leaveModalOverlay');
-  }catch(err){ toast('সংরক্ষণ ব্যর্থ: '+err.message, 'err'); }
-}
-
+/* ---- start / close / cancel leave ---- */
 async function startLeave(id){
-  try{ await db.collection('leaves').doc(id).update({ status:'On Leave', startedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('লিভ শুরু হিসেবে মার্ক করা হয়েছে','ok'); }
-  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+  try{ await db.collection('leaves').doc(id).update({ status:'On Leave', startedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('Marked as On Leave','ok'); }
+  catch(err){ toast('Failed: '+err.message,'err'); }
 }
 
 async function cancelLeave(id){
-  if(!confirm('এই লিভ রিজার্ভেশন বাতিল করবেন?')) return;
-  try{ await db.collection('leaves').doc(id).update({ status:'Cancelled' }); toast('বাতিল করা হয়েছে','ok'); }
-  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+  if(!confirm('Cancel this leave reservation?')) return;
+  try{ await db.collection('leaves').doc(id).update({ status:'Cancelled' }); toast('Cancelled','ok'); }
+  catch(err){ toast('Failed: '+err.message,'err'); }
 }
 
 function openCloseModal(id){
@@ -1540,7 +1616,7 @@ async function confirmCloseLeave(){
   const id = document.getElementById('cl_leaveId').value;
   const returnDate = document.getElementById('cl_returnDate').value;
   const l = leaveList.find(x=>x.id===id);
-  if(!returnDate){ toast('রিটার্ন তারিখ দিন','err'); return; }
+  if(!returnDate){ toast('Please enter the return date','err'); return; }
   const actualDays = daysBetween(l.fromDate, returnDate)+1;
 
   const updates = {
@@ -1553,9 +1629,9 @@ async function confirmCloseLeave(){
     if(ticketBox.style.display!=='none' && document.getElementById('cl_ticketUsed').checked){
       await db.collection('staff').doc(l.tcNo).update({ lastTicket: l.fromDate });
     }
-    toast('লিভ ক্লোজ করা হয়েছে — স্টাফ ফিরে এসেছে','ok');
+    toast('Leave closed — staff has returned','ok');
     closeModal('closeModalOverlay');
-  }catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+  }catch(err){ toast('Failed: '+err.message,'err'); }
 }
 
 /* =========================================================================
@@ -1594,23 +1670,23 @@ function renderLocalLeaveHistory(){
   const types = ['Ramadan Leave','Hajj Leave','National Day','Foundation Day'];
   const rows = leaveList.filter(l=> types.includes(l.type) && l.year===year).sort((a,b)=>a.type.localeCompare(b.type));
   const tbody = document.getElementById('localLeaveHistoryTbody');
-  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:24px;">এই বছরের জন্য এখনো কিছু প্রয়োগ করা হয়নি</td></tr>'; return; }
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet for this year</td></tr>'; return; }
   tbody.innerHTML = rows.map(l=>`<tr><td>${l.type}</td><td>${l.tcNo}</td><td>${l.name}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td></tr>`).join('');
 }
 
 async function applyLocalLeave(type, fromId, toId){
   const from = document.getElementById(fromId).value;
   const to = document.getElementById(toId).value;
-  if(!from || !to){ toast('তারিখ দিন', 'err'); return; }
+  if(!from || !to){ toast('Please enter dates', 'err'); return; }
   const days = daysBetween(from,to)+1;
-  if(days<=0){ toast('তারিখ সঠিক নয়', 'err'); return; }
+  if(days<=0){ toast('Invalid date range', 'err'); return; }
   const year = new Date(from).getFullYear();
 
   const already = leaveList.filter(l=>l.type===type && l.year===year).map(l=>l.tcNo);
   const targets = staffList.filter(s=> s.status==='Active' && !already.includes(s.tcNo));
-  if(targets.length===0){ toast('সব Active স্টাফের জন্য ইতিমধ্যে প্রয়োগ করা হয়েছে', 'err'); return; }
+  if(targets.length===0){ toast('Already applied to all Active staff', 'err'); return; }
 
-  if(!confirm(`${targets.length} জন Active স্টাফের জন্য "${type}" (${days} দিন) প্রয়োগ করা হবে। নিশ্চিত?`)) return;
+  if(!confirm(`"${type}" (${days} days) will be applied to ${targets.length} Active staff. Continue?`)) return;
 
   try{
     const batch = db.batch();
@@ -1624,8 +1700,8 @@ async function applyLocalLeave(type, fromId, toId){
       });
     });
     await batch.commit();
-    toast(`"${type}" ${targets.length} জন স্টাফের জন্য প্রয়োগ করা হয়েছে`, 'ok');
-  }catch(err){ toast('ব্যর্থ: '+err.message, 'err'); }
+    toast(`"${type}" applied to ${targets.length} staff`, 'ok');
+  }catch(err){ toast('Failed: '+err.message, 'err'); }
 }
 
 /* =========================================================================
@@ -1634,7 +1710,7 @@ async function applyLocalLeave(type, fromId, toId){
 function renderTicketCards(){
   const wrap = document.getElementById('ticketCards');
   const active = staffList.filter(s=>s.status!=='Resigned');
-  if(active.length===0){ wrap.innerHTML = '<div class="card empty" style="grid-column:1/-1;"><b>কোনো স্টাফ নেই</b></div>'; return; }
+  if(active.length===0){ wrap.innerHTML = '<div class="card empty" style="grid-column:1/-1;"><b>No staff</b></div>'; return; }
   wrap.innerHTML = active.map(s=>{
     const ti = ticketInfo(s);
     const pct = Math.max(0, Math.min(100, 100 - (ti.daysLeft/(CFG.ticketCycleYears*365))*100));
@@ -1650,7 +1726,7 @@ function renderTicketCards(){
       <div class="k-v"><span>Last Ticket</span><span>${fmtDate(ti.base)}</span></div>
       <div class="k-v"><span>Next Due</span><span>${fmtDate(ti.nextDue)}</span></div>
       <div class="k-v"><span>Cycle</span><span>Every ${CFG.ticketCycleYears} years</span></div>
-      ${ti.due ? '<div class="warn-box" style="margin-top:10px;">এই স্টাফের Up-Down টিকেট এখনই প্রাপ্য</div>' : ''}
+      ${ti.due ? '<div class="warn-box" style="margin-top:10px;">This staff member\'s Up-Down ticket is due now</div>' : ''}
     </div>`;
   }).join('');
 }
@@ -1674,7 +1750,7 @@ function fillIndemnityFromStaff(){
 function calcIndemnity(){
   const joining = document.getElementById('indJoining').value;
   const current = document.getElementById('indCurrent').value;
-  if(!joining || !current){ toast('তারিখ দিন','err'); return; }
+  if(!joining || !current){ toast('Please enter dates','err'); return; }
   const salary = Number(document.getElementById('indSalary').value)||0;
   const food = Number(document.getElementById('indFood').value)||0;
   const house = Number(document.getElementById('indHouse').value)||0;
@@ -1724,8 +1800,8 @@ async function saveConfig(){
     ticketCycleYears: Number(document.getElementById('cfgTicketCycle').value)||2,
     fiveYearDays: 1825
   };
-  try{ await db.collection('settings').doc('appConfig').set(data,{merge:true}); toast('সেটিংস সংরক্ষণ করা হয়েছে','ok'); }
-  catch(err){ toast('ব্যর্থ: '+err.message,'err'); }
+  try{ await db.collection('settings').doc('appConfig').set(data,{merge:true}); toast('Settings saved','ok'); }
+  catch(err){ toast('Failed: '+err.message,'err'); }
 }
 
 /* =========================================================================
@@ -1734,7 +1810,7 @@ async function saveConfig(){
 function printLeaveForm(){
   const tcNo = document.getElementById('detailModalBody').dataset.tcNo;
   const s = staffList.find(x=>x.tcNo===tcNo);
-  if(!s){ toast('স্টাফ পাওয়া যায়নি','err'); return; }
+  if(!s){ toast('Staff not found','err'); return; }
   const b = leaveBalance(s);
   document.getElementById('printBody').innerHTML = `
     <table style="width:100%; border-collapse:collapse;">
