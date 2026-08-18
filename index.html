@@ -515,12 +515,17 @@ tr:hover td{ background:#FBFAF6; }
           </div>
         </div>
 
+        <div class="form-row" style="margin-top:6px;">
+          <div class="field"><label>Overall Start Date</label><input type="text" id="lr_overallStart" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
+          <div class="field"><label>Overall End Date</label><input type="text" id="lr_overallEnd" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
+        </div>
+
         <div class="tbl-wrap" style="margin-top:14px;">
         <table>
           <thead><tr>
             <th style="min-width:170px;">Leave Type</th>
             <th>Leave Balance</th>
-            <th>Year</th>
+            <th style="min-width:90px;">Year</th>
             <th style="min-width:150px;">Start Date</th>
             <th>End Date</th>
             <th style="min-width:80px;">Days</th>
@@ -532,8 +537,9 @@ tr:hover td{ background:#FBFAF6; }
 
         <button type="button" class="btn btn-outline" style="margin-top:14px;" onclick="addMatrixRow()">+ Add Matrix</button>
 
-        <div style="margin-top:20px;">
+        <div style="margin-top:20px; display:flex; gap:10px;">
           <button class="btn btn-gold" onclick="submitLeaveRequest()">Save</button>
+          <button class="btn btn-outline" onclick="cancelLeaveRequest()">Cancel</button>
         </div>
       </div>
     </section>
@@ -1208,6 +1214,7 @@ function rowBalanceDisplay(type, asOfDate){
 }
 
 function matrixRowHTML(rowId, prefillStart){
+  const thisYear = new Date().getFullYear();
   return `<tr class="matrix-row" data-row-id="${rowId}">
     <td>
       <select class="mr-type" style="min-width:160px;" onchange="updateRowCalc('${rowId}')">
@@ -1216,7 +1223,7 @@ function matrixRowHTML(rowId, prefillStart){
       </select>
     </td>
     <td class="mr-balance" style="white-space:nowrap;">—</td>
-    <td class="mr-year" style="white-space:nowrap;">—</td>
+    <td><input type="number" class="mr-year" placeholder="${thisYear}" style="width:80px;"></td>
     <td><input type="date" class="mr-start" value="${prefillStart||''}" onchange="updateRowCalc('${rowId}')" style="min-width:150px;"></td>
     <td class="mr-end" style="white-space:nowrap; color:var(--slate);">—</td>
     <td><input type="number" min="1" class="mr-days" placeholder="Days" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
@@ -1241,6 +1248,7 @@ function addMatrixRow(){
   }
   document.getElementById('matrixRowsContainer').insertAdjacentHTML('beforeend', matrixRowHTML(rowId, prefillStart));
   if(prefillStart) updateRowCalc(rowId);
+  updateOverallDates();
 }
 
 function removeMatrixRow(rowId){
@@ -1249,6 +1257,7 @@ function removeMatrixRow(rowId){
   if(rows.length<=1){ toast('At least one leave entry is required', 'err'); return; }
   const el = container.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
   if(el) el.remove();
+  updateOverallDates();
 }
 
 function updateRowCalc(rowId){
@@ -1258,7 +1267,6 @@ function updateRowCalc(rowId){
   const start = row.querySelector('.mr-start').value;
   const days = Number(row.querySelector('.mr-days').value);
   const endCell = row.querySelector('.mr-end');
-  const yearCell = row.querySelector('.mr-year');
   const balanceCell = row.querySelector('.mr-balance');
 
   // End Date — automatically calculated (Start Date counts as Day 1)
@@ -1274,11 +1282,32 @@ function updateRowCalc(rowId){
     endCell.dataset.iso = '';
   }
 
-  // Year — from the Start Date
-  yearCell.textContent = start ? new Date(start).getFullYear() : '—';
-
   // Leave Balance — projected as of the selected Start Date (or today if not yet chosen)
   balanceCell.textContent = rowBalanceDisplay(type, start);
+
+  updateOverallDates();
+}
+
+// Shows the earliest Start Date and latest End Date across all matrix rows,
+// right above the table, so the whole request's span is visible at a glance.
+function updateOverallDates(){
+  const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
+  let minStart = null, maxEnd = null;
+  rows.forEach(row=>{
+    const start = row.querySelector('.mr-start').value;
+    const endIso = row.querySelector('.mr-end').dataset.iso;
+    if(start){ const d = new Date(start); if(!minStart || d<minStart) minStart = d; }
+    if(endIso){ const d = new Date(endIso); if(!maxEnd || d>maxEnd) maxEnd = d; }
+  });
+  const startBox = document.getElementById('lr_overallStart');
+  const endBox = document.getElementById('lr_overallEnd');
+  if(startBox) startBox.value = minStart ? fmtDDMMYYYY(minStart) : '';
+  if(endBox) endBox.value = maxEnd ? fmtDDMMYYYY(maxEnd) : '';
+}
+function fmtDDMMYYYY(dateObj){
+  const iso = dateObj.toISOString().slice(0,10);
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function refreshAllRowsCalc(){
@@ -1296,6 +1325,12 @@ function openLeaveRequestPage(){
   document.getElementById('matrixRowsContainer').innerHTML = '';
   matrixRowSeq = 0;
   addMatrixRow();
+  updateOverallDates();
+}
+
+function cancelLeaveRequest(){
+  openLeaveRequestPage();
+  toast('Form cleared', 'ok');
 }
 
 async function submitLeaveRequest(){
@@ -1314,11 +1349,12 @@ async function submitLeaveRequest(){
   const entries = [];
   for(const row of rows){
     const type = row.querySelector('.mr-type').value;
+    const year = Number(row.querySelector('.mr-year').value);
     const start = row.querySelector('.mr-start').value;
     const days = Number(row.querySelector('.mr-days').value);
     const endIso = row.querySelector('.mr-end').dataset.iso;
-    if(!type || !start || !days || days<=0){ toast('Please fill Leave Type, Start Date and Days for every entry', 'err'); return; }
-    entries.push({ type, fromDate: start, toDate: endIso, days });
+    if(!type || !year || !start || !days || days<=0){ toast('Please fill Leave Type, Year, Start Date and Days for every entry', 'err'); return; }
+    entries.push({ type, year, fromDate: start, toDate: endIso, days });
   }
 
   try{
@@ -1330,7 +1366,7 @@ async function submitLeaveRequest(){
         fromDate: e.fromDate, toDate: e.toDate, days: e.days,
         ticketType: 'None',
         status: isAdmin ? 'Reserved' : 'Pending',
-        remark: '', year: new Date(e.fromDate).getFullYear(),
+        remark: '', year: e.year,
         requestedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     });
