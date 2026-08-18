@@ -499,7 +499,7 @@ tr:hover td{ background:#FBFAF6; }
         <div><h2>Leave Request</h2><div class="sub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
       </div>
       <div class="card card-pad">
-        <div class="form-row">
+        <div class="form-row c3">
           <div class="field">
             <label>Leave Category *</label>
             <select id="lr_category">
@@ -510,8 +510,13 @@ tr:hover td{ background:#FBFAF6; }
             </select>
           </div>
           <div class="field admin-only" id="lr_staffField">
-            <label>Staff *</label>
-            <select id="lr_tcNo" onchange="refreshAllRowsCalc()"><option value="">Select Staff</option></select>
+            <label>TC No *</label>
+            <input type="text" id="lr_tcNo" list="staffTcDatalist" placeholder="Select or type TC No" oninput="onLrTcNoChange()">
+            <datalist id="staffTcDatalist"></datalist>
+          </div>
+          <div class="field admin-only" id="lr_staffNameField">
+            <label>Staff Name</label>
+            <input type="text" id="lr_staffName" readonly placeholder="Auto-filled" style="background:#F0ECE1;">
           </div>
         </div>
 
@@ -853,6 +858,15 @@ const LEAVE_TYPES = [
   "Employee of the Year","Foundation Day","Hajj Leave","Marriage Leave","Maternity Leave",
   "New Baby Born Leave","National Day","Sick Leave","Study Leave","Local Leave","Emergency Leave"
 ];
+// Leave types with a simple fixed "N days per year" entitlement (as opposed to Annual Leave's
+// precise daily accrual). startYear=null means entitlement begins from the staff's joining year.
+// Foundation Day starts from 2022, the year Saudi Arabia's Founding Day was officially established.
+const FIXED_LEAVE_RULES = {
+  "Eid Al Adha Leave": { daysPerYear: 5, startYear: null },
+  "Eid Al Fitr Leave":  { daysPerYear: 5, startYear: null },
+  "National Day":       { daysPerYear: 1, startYear: null },
+  "Foundation Day":     { daysPerYear: 1, startYear: 2022 }
+};
 let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
 
 let staffList = [];      // cached from Firestore
@@ -1199,19 +1213,64 @@ function leaveTypeOptionsHTML(selected){
 }
 
 function currentLeaveRequestStaff(){
-  const tcNo = (currentUser && currentUser.role==='admin') ? document.getElementById('lr_tcNo').value : (currentUser && currentUser.tcNo);
+  const tcNo = (currentUser && currentUser.role==='admin') ? document.getElementById('lr_tcNo').value.trim() : (currentUser && currentUser.tcNo);
   return staffList.find(x=>x.tcNo===tcNo) || null;
 }
 
-// Leave Balance is tracked precisely only for Annual Leave (accrual-based). Other leave
-// types don't have a running quota in this system, so their balance shows "—".
-function rowBalanceDisplay(type, asOfDate){
-  const staff = currentLeaveRequestStaff();
-  if(!staff || type!=='Annual Leave') return '—';
-  const accrued = accruedAnnualLeave(staff.joiningDate, asOfDate || todayISO());
-  const taken = annualLeaveTakenDays(staff.tcNo);
-  return (accrued - taken).toFixed(1);
+// Days already taken/reserved for a given leave type, optionally scoped to one year.
+function fixedLeaveTakenDays(tcNo, type, year){
+  return leaveList
+    .filter(l=> l.tcNo===tcNo && l.type===type && l.status!=='Cancelled' && l.status!=='Rejected' && (year ? Number(l.year)===Number(year) : true))
+    .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
 }
+// Entitlement for one specific year (0 if the staff wasn't yet eligible that year).
+function fixedLeaveEntitlementForYear(type, staff, year){
+  const rule = FIXED_LEAVE_RULES[type];
+  if(!rule) return 0;
+  const joinYear = new Date(staff.joiningDate).getFullYear();
+  const effectiveStartYear = rule.startYear ? Math.max(rule.startYear, joinYear) : joinYear;
+  return year >= effectiveStartYear ? rule.daysPerYear : 0;
+}
+// Cumulative entitlement across every eligible year up through the current year.
+function fixedLeaveEntitlementTotal(type, staff){
+  const rule = FIXED_LEAVE_RULES[type];
+  if(!rule) return 0;
+  const joinYear = new Date(staff.joiningDate).getFullYear();
+  const effectiveStartYear = rule.startYear ? Math.max(rule.startYear, joinYear) : joinYear;
+  const currentYear = new Date().getFullYear();
+  const yearsElapsed = Math.max(0, currentYear - effectiveStartYear + 1);
+  return yearsElapsed * rule.daysPerYear;
+}
+
+// Leave Balance: precise daily accrual for Annual Leave; fixed N-days/year entitlement for
+// Eid Al Adha, Eid Al Fitr, National Day, and Foundation Day (minus what's already taken).
+// When the row's Year column is filled in, the balance is scoped to that single year;
+// otherwise it shows the cumulative balance through the current year. Other types show "—"
+// since this system doesn't track a running quota for them.
+function rowBalanceDisplay(type, asOfDate, year){
+  const staff = currentLeaveRequestStaff();
+  if(!staff || !type) return '—';
+
+  if(type==='Annual Leave'){
+    const accrued = accruedAnnualLeave(staff.joiningDate, asOfDate || todayISO());
+    const taken = annualLeaveTakenDays(staff.tcNo);
+    return (accrued - taken).toFixed(1);
+  }
+
+  if(FIXED_LEAVE_RULES[type]){
+    if(year){
+      const entitlement = fixedLeaveEntitlementForYear(type, staff, Number(year));
+      const taken = fixedLeaveTakenDays(staff.tcNo, type, Number(year));
+      return (entitlement - taken).toFixed(0);
+    }
+    const entitlement = fixedLeaveEntitlementTotal(type, staff);
+    const taken = fixedLeaveTakenDays(staff.tcNo, type, null);
+    return (entitlement - taken).toFixed(0);
+  }
+
+  return '—';
+}
+
 
 function matrixRowHTML(rowId, prefillStart){
   const thisYear = new Date().getFullYear();
@@ -1223,7 +1282,7 @@ function matrixRowHTML(rowId, prefillStart){
       </select>
     </td>
     <td class="mr-balance" style="white-space:nowrap;">—</td>
-    <td><input type="number" class="mr-year" placeholder="${thisYear}" style="width:80px;"></td>
+    <td><input type="number" class="mr-year" placeholder="${thisYear}" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
     <td><input type="date" class="mr-start" value="${prefillStart||''}" onchange="updateRowCalc('${rowId}')" style="min-width:150px;"></td>
     <td class="mr-end" style="white-space:nowrap; color:var(--slate);">—</td>
     <td><input type="number" min="1" class="mr-days" placeholder="Days" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
@@ -1266,6 +1325,7 @@ function updateRowCalc(rowId){
   const type = row.querySelector('.mr-type').value;
   const start = row.querySelector('.mr-start').value;
   const days = Number(row.querySelector('.mr-days').value);
+  const year = row.querySelector('.mr-year').value;
   const endCell = row.querySelector('.mr-end');
   const balanceCell = row.querySelector('.mr-balance');
 
@@ -1282,8 +1342,8 @@ function updateRowCalc(rowId){
     endCell.dataset.iso = '';
   }
 
-  // Leave Balance — projected as of the selected Start Date (or today if not yet chosen)
-  balanceCell.textContent = rowBalanceDisplay(type, start);
+  // Leave Balance — Year (if filled in) scopes it to that single year, otherwise cumulative
+  balanceCell.textContent = rowBalanceDisplay(type, start, year);
 
   updateOverallDates();
 }
@@ -1314,13 +1374,27 @@ function refreshAllRowsCalc(){
   document.querySelectorAll('#matrixRowsContainer .matrix-row').forEach(row=> updateRowCalc(row.dataset.rowId));
 }
 
+function onLrTcNoChange(){
+  const tcNo = document.getElementById('lr_tcNo').value.trim();
+  const nameInput = document.getElementById('lr_staffName');
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  nameInput.value = s ? s.name : '';
+  refreshAllRowsCalc();
+}
+
 function openLeaveRequestPage(){
   document.getElementById('lr_category').value = '';
-  const staffSel = document.getElementById('lr_tcNo');
+  const tcInput = document.getElementById('lr_tcNo');
+  const nameInput = document.getElementById('lr_staffName');
   if(currentUser && currentUser.role!=='admin'){
-    // staff can only request for themselves
-    staffSel.innerHTML = `<option value="${currentUser.tcNo}">${currentUser.name}</option>`;
-    staffSel.value = currentUser.tcNo;
+    // staff can only request for themselves — lock TC No to their own
+    tcInput.value = currentUser.tcNo;
+    tcInput.readOnly = true;
+    nameInput.value = currentUser.name;
+  } else {
+    tcInput.value = '';
+    tcInput.readOnly = false;
+    nameInput.value = '';
   }
   document.getElementById('matrixRowsContainer').innerHTML = '';
   matrixRowSeq = 0;
@@ -1337,7 +1411,7 @@ async function submitLeaveRequest(){
   if(!currentUser) return;
   const category = document.getElementById('lr_category').value;
   const isAdmin = currentUser.role==='admin';
-  const tcNo = isAdmin ? document.getElementById('lr_tcNo').value : currentUser.tcNo;
+  const tcNo = isAdmin ? document.getElementById('lr_tcNo').value.trim() : currentUser.tcNo;
   if(!category){ toast('Please select a Leave Category', 'err'); return; }
   if(!tcNo){ toast('Please select a Staff', 'err'); return; }
   const s = staffList.find(x=>x.tcNo===tcNo);
@@ -1671,12 +1745,10 @@ function renderStaffSelects(){
     sel.innerHTML = '<option value="">— manual entry —</option>' + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
     sel.value = currentVal;
   });
-  // Leave Request staff picker (admin only — staff members request only for themselves)
-  const lrSel = document.getElementById('lr_tcNo');
-  if(lrSel && currentUser && currentUser.role==='admin'){
-    const currentVal = lrSel.value;
-    lrSel.innerHTML = '<option value="">Select Staff</option>' + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
-    lrSel.value = currentVal;
+  // Leave Request TC No datalist (dropdown suggestions + free typing, admin only)
+  const dl = document.getElementById('staffTcDatalist');
+  if(dl){
+    dl.innerHTML = activeStaff.map(s=>`<option value="${s.tcNo}">${s.name}</option>`).join('');
   }
 }
 
