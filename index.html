@@ -343,6 +343,10 @@ tr:hover td{ background:#FBFAF6; }
     </div>
 
     <div class="nav-group-label admin-only">Tools</div>
+    <div class="nav-item admin-only" data-view="bulkImport" onclick="showView('bulkImport')">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+      Bulk Import
+    </div>
     <div class="nav-item admin-only" data-view="indemnity" onclick="showView('indemnity')">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
       Indemnity Calc.
@@ -687,6 +691,31 @@ tr:hover td{ background:#FBFAF6; }
         </div>
       </div>
       <div class="grid grid-3" id="ticketCards"></div>
+    </section>
+
+    <!-- ================= BULK IMPORT ================= -->
+    <section id="view-bulkImport" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h2>Bulk Import Leave Records</h2><div class="sub">Import many historical leave records at once (e.g. from an old spreadsheet)</div><div class="divider-motif"></div></div>
+      </div>
+      <div class="note-box" style="margin-bottom:16px;">
+        Paste CSV data below with the header row exactly as shown, one leave record per line:<br>
+        <code>TCNo,Category,Type,Year,StartDate,Days,TicketType,Remark</code><br>
+        Example: <code>3034,Annual Leave,Annual Leave,2004,2004-07-05,48,Company Ticket,</code><br>
+        StartDate must be in <b>YYYY-MM-DD</b> format. TicketType and Remark can be left blank (just leave the comma). Category must be one of: Emergency, Local, Annual Leave. All imported records are saved with status <b>Closed</b> (i.e. already-completed historical leave) so they count toward balances immediately.
+      </div>
+      <div class="card card-pad">
+        <div class="field"><label>CSV Data</label>
+          <textarea id="bi_csvInput" rows="12" style="width:100%; font-family:monospace; font-size:12.5px; padding:10px; border:1.5px solid var(--border); border-radius:10px;" placeholder="TCNo,Category,Type,Year,StartDate,Days,TicketType,Remark
+3034,Annual Leave,Annual Leave,2004,2004-07-05,48,Company Ticket,"></textarea>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <button class="btn btn-outline" onclick="previewBulkImport()">Preview</button>
+          <button class="btn btn-gold" id="bi_importBtn" onclick="runBulkImport()" disabled>Import All</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('bi_csvInput').value=''; document.getElementById('bi_preview').innerHTML=''; document.getElementById('bi_importBtn').disabled=true;">Clear</button>
+        </div>
+        <div id="bi_preview" style="margin-top:16px;"></div>
+      </div>
     </section>
 
     <!-- ================= INDEMNITY ================= -->
@@ -1134,7 +1163,7 @@ function refreshAll(){
 /* =========================================================================
    NAVIGATION
    ========================================================================= */
-const ADMIN_ONLY_VIEWS = ['staff','contracts','approvals','localLeave','tickets','indemnity','settings'];
+const ADMIN_ONLY_VIEWS = ['staff','contracts','approvals','localLeave','tickets','indemnity','settings','bulkImport'];
 
 function showView(name){
   if(currentUser && currentUser.role!=='admin' && ADMIN_ONLY_VIEWS.includes(name)) name = 'dashboard';
@@ -2240,6 +2269,99 @@ function calcIndemnity(){
 /* =========================================================================
    SETTINGS
    ========================================================================= */
+/* =========================================================================
+   BULK IMPORT — historical leave records
+   ========================================================================= */
+let parsedBulkRows = [];
+
+function parseBulkCsv(text){
+  const lines = text.trim().split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(lines.length===0) return { rows:[], errors:['No data found'] };
+  // drop header row if present
+  if(/^tcno/i.test(lines[0])) lines.shift();
+  const rows = [];
+  const errors = [];
+  lines.forEach((line, i)=>{
+    const parts = line.split(',').map(p=>p.trim());
+    if(parts.length<6){ errors.push(`Line ${i+1}: not enough columns`); return; }
+    const [tcNo, category, type, year, startDate, days, ticketType, ...remarkParts] = parts;
+    const remark = remarkParts.join(',');
+    const s = staffList.find(x=>x.tcNo===tcNo);
+    if(!s){ errors.push(`Line ${i+1}: TC No "${tcNo}" not found in Staff Directory`); return; }
+    if(!LEAVE_CATEGORIES.includes(category)){ errors.push(`Line ${i+1}: Category must be Emergency, Local, or Annual Leave (got "${category}")`); return; }
+    if(!type){ errors.push(`Line ${i+1}: Leave Type is required`); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)){ errors.push(`Line ${i+1}: StartDate must be YYYY-MM-DD (got "${startDate}")`); return; }
+    const daysNum = Number(days);
+    if(!daysNum || daysNum<=0){ errors.push(`Line ${i+1}: Days must be a positive number`); return; }
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + (daysNum-1));
+    rows.push({
+      tcNo, name: s.name, category, type,
+      year: Number(year) || new Date(startDate).getFullYear(),
+      fromDate: startDate, toDate: endDate.toISOString().slice(0,10), days: daysNum,
+      ticketType: (ticketType && ticketType!=='') ? ticketType : 'None',
+      remark: remark || ''
+    });
+  });
+  return { rows, errors };
+}
+
+function previewBulkImport(){
+  const text = document.getElementById('bi_csvInput').value;
+  const { rows, errors } = parseBulkCsv(text);
+  parsedBulkRows = rows;
+  const box = document.getElementById('bi_preview');
+  let html = '';
+  if(errors.length>0){
+    html += `<div class="warn-box" style="margin-bottom:12px;"><b>${errors.length} line(s) had problems and will be skipped:</b><br>${errors.slice(0,15).join('<br>')}${errors.length>15?'<br>…and '+(errors.length-15)+' more':''}</div>`;
+  }
+  if(rows.length>0){
+    html += `<div class="note-box" style="margin-bottom:12px;">${rows.length} valid record(s) ready to import.</div>`;
+    html += `<div class="tbl-wrap" style="max-height:320px; overflow-y:auto;"><table><thead><tr><th>TC No</th><th>Name</th><th>Category</th><th>Type</th><th>Year</th><th>From</th><th>To</th><th>Days</th></tr></thead><tbody>`;
+    html += rows.slice(0,50).map(r=>`<tr><td>${r.tcNo}</td><td>${r.name}</td><td>${r.category}</td><td>${r.type}</td><td>${r.year}</td><td>${fmtDate(r.fromDate)}</td><td>${fmtDate(r.toDate)}</td><td>${r.days}</td></tr>`).join('');
+    html += `</tbody></table></div>`;
+    if(rows.length>50) html += `<div class="hint" style="margin-top:6px;">Showing first 50 of ${rows.length} rows.</div>`;
+  } else {
+    html += '<div class="empty"><b>No valid rows to import</b>Check the CSV format and try again</div>';
+  }
+  box.innerHTML = html;
+  document.getElementById('bi_importBtn').disabled = rows.length===0;
+}
+
+async function runBulkImport(){
+  if(parsedBulkRows.length===0){ toast('Click Preview first', 'err'); return; }
+  if(!confirm(`Import ${parsedBulkRows.length} historical leave record(s) as Closed? This cannot be undone automatically.`)) return;
+  const btn = document.getElementById('bi_importBtn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try{
+    // Firestore batches are capped at 500 writes — chunk accordingly
+    const chunkSize = 400;
+    for(let i=0; i<parsedBulkRows.length; i+=chunkSize){
+      const chunk = parsedBulkRows.slice(i, i+chunkSize);
+      const batch = db.batch();
+      chunk.forEach(r=>{
+        const ref = db.collection('leaves').doc();
+        batch.set(ref, {
+          tcNo: r.tcNo, name: r.name, category: r.category, type: r.type,
+          fromDate: r.fromDate, toDate: r.toDate, days: r.days,
+          ticketType: r.ticketType, status: 'Closed', remark: r.remark, year: r.year,
+          actualReturnDate: r.toDate,
+          requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          closedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+    }
+    toast(`${parsedBulkRows.length} historical leave record(s) imported`, 'ok');
+    document.getElementById('bi_csvInput').value = '';
+    document.getElementById('bi_preview').innerHTML = '';
+    parsedBulkRows = [];
+  }catch(err){
+    toast('Import failed: '+err.message, 'err');
+  }
+  btn.disabled = false; btn.textContent = 'Import All';
+}
+
 async function saveConfig(){
   const data = {
     rateBeforeFive: Number(document.getElementById('cfgRateBefore').value)||21,
