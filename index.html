@@ -245,6 +245,9 @@ tr:hover td{ background:#FBFAF6; }
 .k-v span:last-child{ font-weight:600; color:var(--ink); }
 .note-box{ background:var(--info-bg); color:var(--info); border-radius:10px; padding:12px 14px; font-size:12.8px; line-height:1.55; }
 .warn-box{ background:var(--warning-bg); color:var(--warning); border-radius:10px; padding:12px 14px; font-size:12.8px; line-height:1.55; }
+tr.row-exceeds-balance{ background:var(--danger-bg) !important; }
+tr.row-exceeds-balance td{ background:var(--danger-bg); }
+tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
 .loading-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; color:var(--slate); background:var(--cream); }
 .spinner{ width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--gold); animation:spin .8s linear infinite; }
 @keyframes spin{ to{ transform:rotate(360deg);} }
@@ -552,6 +555,8 @@ tr:hover td{ background:#FBFAF6; }
           <div class="field"><label>Overall Start Date</label><input type="text" id="lr_overallStart" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
           <div class="field"><label>Overall End Date</label><input type="text" id="lr_overallEnd" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
         </div>
+
+        <div class="warn-box" id="lr_balanceWarning" style="display:none; margin-top:12px;"></div>
 
         <div class="tbl-wrap" style="margin-top:14px;">
         <table>
@@ -898,6 +903,45 @@ tr:hover td{ background:#FBFAF6; }
   </div>
 </div>
 
+<!-- ===================== MODAL: EDIT LEAVE (admin only) ===================== -->
+<div class="overlay" id="editLeaveModalOverlay">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Edit Leave Record</h3><button class="modal-close" onclick="closeModal('editLeaveModalOverlay')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="el_docId">
+      <div class="note-box" style="margin-bottom:14px;" id="el_staffNote"></div>
+      <div class="form-row c3">
+        <div class="field"><label>Leave Category</label>
+          <select id="el_category"><option>Emergency</option><option>Local</option><option>Annual Leave</option></select>
+        </div>
+        <div class="field"><label>Leave Type</label><select id="el_type"></select></div>
+        <div class="field"><label>Year</label><input type="number" id="el_year"></div>
+      </div>
+      <div class="form-row c3">
+        <div class="field"><label>Start Date</label><input type="date" id="el_start" onchange="recalcEditLeaveEnd()"></div>
+        <div class="field"><label>Days</label><input type="number" min="1" id="el_days" oninput="recalcEditLeaveEnd()"></div>
+        <div class="field"><label>End Date <span class="hint">(auto)</span></label><input type="text" id="el_end" readonly style="background:#F0ECE1;"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Ticket Type</label>
+          <select id="el_ticketType"><option value="None">None</option><option value="Self Ticket">Self Ticket</option><option value="Company Ticket">Company Ticket</option></select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="el_status"><option>Pending</option><option>Reserved</option><option>On Leave</option><option>Closed</option><option>Cancelled</option><option>Rejected</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Remark</label><input type="text" id="el_remark"></div>
+    </div>
+    <div class="modal-foot" style="justify-content:space-between;">
+      <button class="btn btn-danger" onclick="deleteLeaveRecord()">Delete This Record</button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('editLeaveModalOverlay')">Cancel</button>
+        <button class="btn btn-gold" onclick="saveEditedLeave()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== MODAL: CLOSE LEAVE (return) ===================== -->
 <div class="overlay" id="closeModalOverlay">
   <div class="modal">
@@ -976,6 +1020,12 @@ const FIXED_LEAVE_RULES = {
 // Air ticket entitlement cycle by staff level
 const LEVEL_TICKET_CYCLE_YEARS = { "Staff": 2, "Manager": 1 };
 let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
+
+// Groups together leave records that were submitted/imported as one combined trip
+// (e.g. Annual + Eid + Unpaid taken back-to-back), so they can be viewed/edited as a unit.
+function newGroupId(){
+  return 'G' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,6).toUpperCase();
+}
 
 let staffList = [];      // cached from Firestore
 let leaveList = [];      // cached from Firestore
@@ -1155,6 +1205,7 @@ function refreshAll(){
   renderTicketCards();
   renderStaffSelects();
   renderLeaveTypesGrid();
+  refreshAllRowsCalc(); // keep any open Leave Request balance/end-date columns in sync with the latest data
   populateYearSelector();
   document.getElementById('cfgStaffCount').textContent = staffList.length;
   document.getElementById('cfgLeaveCount').textContent = leaveList.length;
@@ -1519,6 +1570,7 @@ function removeMatrixRow(rowId){
   if(rows.length<=1){ toast('At least one leave entry is required', 'err'); return; }
   const el = container.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
   if(el) el.remove();
+  updateBalanceWarningBanner();
   updateOverallDates();
 }
 
@@ -1546,9 +1598,29 @@ function updateRowCalc(rowId){
   }
 
   // Leave Balance — Year (if filled in) scopes it to that single year, otherwise cumulative
-  balanceCell.textContent = rowBalanceDisplay(type, start, year);
+  const balanceStr = rowBalanceDisplay(type, start, year);
+  balanceCell.textContent = balanceStr;
 
+  // Highlight the row red if the requested Days exceed the available balance for this type
+  const balanceNum = parseFloat(balanceStr);
+  const exceeds = !isNaN(balanceNum) && days>0 && days>balanceNum;
+  row.classList.toggle('row-exceeds-balance', exceeds);
+  balanceCell.title = exceeds ? `Requested ${days} day(s) exceeds the available balance of ${balanceStr}` : '';
+
+  updateBalanceWarningBanner();
   updateOverallDates();
+}
+
+function updateBalanceWarningBanner(){
+  const banner = document.getElementById('lr_balanceWarning');
+  if(!banner) return;
+  const exceedCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-exceeds-balance').length;
+  if(exceedCount>0){
+    banner.style.display = 'block';
+    banner.innerHTML = `⚠️ ${exceedCount} entry(ies) exceed the available leave balance — highlighted in red below. Please review, or you'll be asked to confirm before saving.`;
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 // Shows the earliest Start Date and latest End Date across all matrix rows,
@@ -1640,6 +1712,12 @@ async function submitLeaveRequest(){
     const remark = row.querySelector('.mr-remark').value.trim();
     if(!type || !year || !start || !days || days<=0){ toast('Please fill Leave Type, Year, Start Date and Days for every entry', 'err'); return; }
     entries.push({ type, year, fromDate: start, toDate: endIso, days, remark });
+  }
+
+  const exceedCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-exceeds-balance').length;
+  if(exceedCount>0){
+    const proceed = confirm(`${exceedCount} entry(ies) exceed the available leave balance. Do you want to save anyway?`);
+    if(!proceed) return;
   }
 
   try{
@@ -1983,6 +2061,7 @@ function renderLeaveTable(){
       } else {
         actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
       }
+      actions += ` <button class="btn btn-outline btn-sm" onclick="openEditLeaveModal('${l.id}')">Edit</button>`;
     } else {
       actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
     }
@@ -2037,6 +2116,77 @@ async function cancelLeave(id){
   if(!confirm('Cancel this leave reservation?')) return;
   try{ await db.collection('leaves').doc(id).update({ status:'Cancelled' }); toast('Cancelled','ok'); }
   catch(err){ toast('Failed: '+err.message,'err'); }
+}
+
+/* =========================================================================
+   ADMIN: EDIT / DELETE ANY SAVED LEAVE RECORD
+   ========================================================================= */
+function openEditLeaveModal(id){
+  const l = leaveList.find(x=>x.id===id);
+  if(!l) return;
+  document.getElementById('el_docId').value = id;
+  document.getElementById('el_staffNote').innerHTML = `<b>${l.name}</b> — TC ${l.tcNo}`;
+  document.getElementById('el_category').value = l.category || 'Local';
+  document.getElementById('el_type').innerHTML = leaveTypeOptionsHTML(l.type) || `<option>${l.type}</option>`;
+  if(![...document.getElementById('el_type').options].some(o=>o.value===l.type)){
+    document.getElementById('el_type').insertAdjacentHTML('afterbegin', `<option value="${l.type}" selected>${l.type}</option>`);
+  }
+  document.getElementById('el_type').value = l.type;
+  document.getElementById('el_year').value = l.year || new Date(l.fromDate).getFullYear();
+  document.getElementById('el_start').value = l.fromDate;
+  document.getElementById('el_days').value = l.days;
+  document.getElementById('el_ticketType').value = l.ticketType || 'None';
+  document.getElementById('el_status').value = l.status;
+  document.getElementById('el_remark').value = l.remark || '';
+  recalcEditLeaveEnd();
+  openModalEl('editLeaveModalOverlay');
+}
+
+function recalcEditLeaveEnd(){
+  const start = document.getElementById('el_start').value;
+  const days = Number(document.getElementById('el_days').value);
+  const endBox = document.getElementById('el_end');
+  if(start && days>0){
+    const endDate = new Date(start);
+    endDate.setDate(endDate.getDate() + (days-1));
+    const iso = endDate.toISOString().slice(0,10);
+    endBox.value = fmtDate(iso);
+    endBox.dataset.iso = iso;
+  } else {
+    endBox.value = ''; endBox.dataset.iso = '';
+  }
+}
+
+async function saveEditedLeave(){
+  const id = document.getElementById('el_docId').value;
+  const days = Number(document.getElementById('el_days').value);
+  const start = document.getElementById('el_start').value;
+  const endIso = document.getElementById('el_end').dataset.iso;
+  if(!start || !days || days<=0 || !endIso){ toast('Please fill Start Date and Days correctly', 'err'); return; }
+  const data = {
+    category: document.getElementById('el_category').value,
+    type: document.getElementById('el_type').value,
+    year: Number(document.getElementById('el_year').value) || new Date(start).getFullYear(),
+    fromDate: start, toDate: endIso, days,
+    ticketType: document.getElementById('el_ticketType').value,
+    status: document.getElementById('el_status').value,
+    remark: document.getElementById('el_remark').value.trim()
+  };
+  try{
+    await db.collection('leaves').doc(id).update(data);
+    toast('Leave record updated — balance recalculated', 'ok');
+    closeModal('editLeaveModalOverlay');
+  }catch(err){ toast('Update failed: '+err.message, 'err'); }
+}
+
+async function deleteLeaveRecord(){
+  const id = document.getElementById('el_docId').value;
+  if(!confirm('Delete this leave record permanently? This cannot be undone.')) return;
+  try{
+    await db.collection('leaves').doc(id).delete();
+    toast('Leave record deleted — balance recalculated', 'ok');
+    closeModal('editLeaveModalOverlay');
+  }catch(err){ toast('Delete failed: '+err.message, 'err'); }
 }
 
 function openCloseModal(id){
