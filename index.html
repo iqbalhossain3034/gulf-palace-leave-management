@@ -557,9 +557,10 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
           </div>
         </div>
 
-        <div class="form-row" style="margin-top:6px;">
+        <div class="form-row c3" style="margin-top:6px;">
           <div class="field"><label>Overall Start Date</label><input type="text" id="lr_overallStart" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
           <div class="field"><label>Overall End Date</label><input type="text" id="lr_overallEnd" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
+          <div class="field"><label>Total Days</label><input type="text" id="lr_totalDays" readonly placeholder="0" style="background:#F0ECE1; font-weight:700;"></div>
         </div>
 
         <div class="warn-box" id="lr_balanceWarning" style="display:none; margin-top:12px;"></div>
@@ -1200,18 +1201,19 @@ async function seedInitialStaff(){
 
 function refreshAll(){
   if(!currentUser) return; // wait until role is resolved before rendering anything
-  renderDashboard();
-  renderMyLeaveHome();
-  renderStaffGrid();
-  renderContracts();
-  renderLeaveTable();
-  renderLeaveApproved();
-  renderApprovals();
-  renderTicketCards();
-  renderStaffSelects();
-  renderLeaveTypesGrid();
-  refreshAllRowsCalc(); // keep any open Leave Request balance/end-date columns in sync with the latest data
-  populateYearSelector();
+  const safe = (fn, label)=>{ try{ fn(); }catch(err){ console.error('refreshAll: '+label+' failed:', err); } };
+  safe(renderDashboard, 'renderDashboard');
+  safe(renderMyLeaveHome, 'renderMyLeaveHome');
+  safe(renderStaffGrid, 'renderStaffGrid');
+  safe(renderContracts, 'renderContracts');
+  safe(renderLeaveTable, 'renderLeaveTable');
+  safe(renderLeaveApproved, 'renderLeaveApproved');
+  safe(renderApprovals, 'renderApprovals');
+  safe(renderTicketCards, 'renderTicketCards');
+  safe(renderStaffSelects, 'renderStaffSelects');
+  safe(renderLeaveTypesGrid, 'renderLeaveTypesGrid');
+  safe(refreshAllRowsCalc, 'refreshAllRowsCalc'); // keep any open Leave Request balance/end-date columns in sync
+  safe(populateYearSelector, 'populateYearSelector');
   document.getElementById('cfgStaffCount').textContent = staffList.length;
   document.getElementById('cfgLeaveCount').textContent = leaveList.length;
 }
@@ -1301,16 +1303,23 @@ function ticketCycleYearsForStaff(staff){
 // based on the staff's ticketLog (dates on which a ticket was actually used).
 function computeTicketPeriods(staff){
   const cycleYears = ticketCycleYearsForStaff(staff);
-  const cycleDays = cycleYears*365;
   const today = new Date();
-  const log = staff.ticketLog || [];
+  // Ticket usage is derived directly from completed (Closed) Annual Leave records that had a
+  // ticket type selected — this covers both live app usage and bulk-imported history, with a
+  // single source of truth (no separate log to keep in sync).
+  const usageEvents = leaveList
+    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType && l.ticketType!=='None' && l.status==='Closed')
+    .map(l=> ({ date: l.fromDate, type: l.ticketType }));
   const periods = [];
   let periodStart = new Date(staff.joiningDate);
   let guard = 0;
   while(guard<25){
     guard++;
-    const periodEnd = new Date(periodStart.getTime() + cycleDays*MS_DAY);
-    const match = log.find(u=>{ const d = new Date(u.date); return d>=periodStart && d<=periodEnd; });
+    // Calendar-correct: add whole years so the day/month never drifts (leap years would
+    // otherwise shift a fixed "365*N days" calculation by a day here and there).
+    const periodEnd = new Date(periodStart);
+    periodEnd.setFullYear(periodEnd.getFullYear() + cycleYears);
+    const match = usageEvents.find(u=>{ const d = new Date(u.date); return d>=periodStart && d<=periodEnd; });
     let status;
     if(match) status = 'Used';
     else if(periodEnd < today) status = 'Due';
@@ -1384,17 +1393,22 @@ function renderDashboard(){
     balBox.innerHTML = '<div class="empty"><b>No staff yet</b>Add staff from Staff Directory</div>';
   } else {
     balBox.innerHTML = staffList.filter(s=>s.status!=='Resigned').map(s=>{
-      const b = leaveBalance(s);
-      const pct = Math.max(0, Math.min(100, (b.balance/(b.accrued||1))*100));
-      const color = b.balance<10 ? 'var(--danger)' : b.balance<30 ? 'var(--warning)' : 'var(--success)';
-      return `<div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-soft);">
-        <div class="ring" style="background:conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg);"><span>${b.balance.toFixed(0)}</span></div>
-        <div style="flex:1;">
-          <div class="staff-name" style="font-size:13.5px;">${s.name}</div>
-          <div class="staff-role">TC ${s.tcNo} · ${s.position}</div>
-        </div>
-        <div style="text-align:right; font-size:12px; color:var(--slate);">Accrued ${b.accrued.toFixed(1)}<br>Taken ${b.taken.toFixed(0)}</div>
-      </div>`;
+      try{
+        const b = leaveBalance(s);
+        const pct = Math.max(0, Math.min(100, (b.balance/(b.accrued||1))*100));
+        const color = b.balance<10 ? 'var(--danger)' : b.balance<30 ? 'var(--warning)' : 'var(--success)';
+        return `<div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-soft);">
+          <div class="ring" style="background:conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg);"><span>${b.balance.toFixed(0)}</span></div>
+          <div style="flex:1;">
+            <div class="staff-name" style="font-size:13.5px;">${s.name}</div>
+            <div class="staff-role">TC ${s.tcNo} · ${s.position}</div>
+          </div>
+          <div style="text-align:right; font-size:12px; color:var(--slate);">Accrued ${b.accrued.toFixed(1)}<br>Taken ${b.taken.toFixed(0)}</div>
+        </div>`;
+      }catch(err){
+        console.error('Dashboard balance render error for', s.tcNo, err);
+        return `<div style="padding:10px 0; border-bottom:1px solid var(--border-soft); color:var(--danger); font-size:12.5px;">Could not compute balance for ${s.name||s.tcNo} (${err.message})</div>`;
+      }
     }).join('');
   }
 
@@ -1646,17 +1660,21 @@ function updateBalanceWarningBanner(){
 // right above the table, so the whole request's span is visible at a glance.
 function updateOverallDates(){
   const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
-  let minStart = null, maxEnd = null;
+  let minStart = null, maxEnd = null, totalDays = 0;
   rows.forEach(row=>{
     const start = row.querySelector('.mr-start').value;
     const endIso = row.querySelector('.mr-end').dataset.iso;
+    const days = Number(row.querySelector('.mr-days').value) || 0;
     if(start){ const d = new Date(start); if(!minStart || d<minStart) minStart = d; }
     if(endIso){ const d = new Date(endIso); if(!maxEnd || d>maxEnd) maxEnd = d; }
+    totalDays += days;
   });
   const startBox = document.getElementById('lr_overallStart');
   const endBox = document.getElementById('lr_overallEnd');
+  const totalBox = document.getElementById('lr_totalDays');
   if(startBox) startBox.value = minStart ? fmtDDMMYYYY(minStart) : '';
   if(endBox) endBox.value = maxEnd ? fmtDDMMYYYY(maxEnd) : '';
+  if(totalBox) totalBox.value = totalDays + (totalDays===1 ? ' day' : ' days');
 }
 function fmtDDMMYYYY(dateObj){
   const iso = dateObj.toISOString().slice(0,10);
@@ -2344,16 +2362,15 @@ async function confirmCloseLeave(){
     status:'Closed', actualReturnDate:returnDate, days:actualDays>0?actualDays:l.days,
     closedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
+  // Ticket usage is derived from (status='Closed' + ticketType!='None') on this very record,
+  // so if the admin unchecks "ticket used" here, clear ticketType so it isn't counted.
+  const ticketBox = document.getElementById('cl_ticketUsedWrap');
+  if(ticketBox.style.display!=='none' && !document.getElementById('cl_ticketUsed').checked){
+    updates.ticketType = 'None';
+  }
   try{
     await db.collection('leaves').doc(id).update(updates);
-    const ticketBox = document.getElementById('cl_ticketUsedWrap');
-    if(ticketBox.style.display!=='none' && document.getElementById('cl_ticketUsed').checked){
-      await db.collection('staff').doc(l.tcNo).update({
-        lastTicket: l.fromDate,
-        ticketLog: firebase.firestore.FieldValue.arrayUnion({ date: l.fromDate, type: l.ticketType||'Self Ticket' })
-      });
-    }
-    toast('Leave closed — staff has returned','ok');
+    toast('Leave closed — staff has returned, balance and ticket status recalculated','ok');
     closeModal('closeModalOverlay');
   }catch(err){ toast('Failed: '+err.message,'err'); }
 }
