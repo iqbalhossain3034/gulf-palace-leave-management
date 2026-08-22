@@ -320,7 +320,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
     </div>
 
     <div class="nav-group-label">Leave</div>
-    <div class="nav-item" data-view="leaveRequest" onclick="showView('leaveRequest')">
+    <div class="nav-item" data-view="leaveRequest" onclick="startNewLeaveRequest()">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       Leave Request
     </div>
@@ -377,7 +377,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
           <div class="sub" id="dashSub">Laundry Department · The Gulf Palace, Dammam</div>
           <div class="divider-motif"></div>
         </div>
-        <button class="btn btn-gold" onclick="showView('leaveRequest')">+ New Leave Request</button>
+        <button class="btn btn-gold" onclick="startNewLeaveRequest()">+ New Leave Request</button>
       </div>
 
       <!-- ===== STAFF PERSONAL SUMMARY (staff role only) ===== -->
@@ -513,8 +513,14 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
     <!-- ================= LEAVE RECORDS ================= -->
     <section id="view-leaveRequest" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>Leave Request</h2><div class="sub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
+        <div><h2 id="lr_pageTitle">Leave Request</h2><div class="sub" id="lr_pageSub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
       </div>
+
+      <div class="card card-pad admin-only" id="lr_statusPanel" style="display:none; margin-bottom:16px;">
+        <div class="section-title">Status &amp; Actions</div>
+        <div id="lr_statusPanelBody"></div>
+      </div>
+
       <div class="card card-pad">
         <div class="form-row c3">
           <div class="field">
@@ -574,12 +580,13 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
         </table>
         </div>
 
-        <button type="button" class="btn btn-outline" style="margin-top:14px;" onclick="addMatrixRow()">+ Add Matrix</button>
+        <button type="button" class="btn btn-outline" id="lr_addMatrixBtn" style="margin-top:14px;" onclick="addMatrixRow()">+ Add Matrix</button>
 
-        <div style="margin-top:20px; display:flex; gap:10px;">
-          <button class="btn btn-gold" onclick="submitLeaveRequest()">Save</button>
-          <button class="btn btn-outline" onclick="cancelLeaveRequest()">Cancel</button>
+        <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-gold" id="lr_saveBtn" onclick="submitLeaveRequest()">Save</button>
+          <button class="btn btn-outline" id="lr_cancelBtn" onclick="cancelLeaveRequest()">Cancel</button>
           <button class="btn btn-outline" onclick="printLeaveRequestForm()">🖨️ Print</button>
+          <button class="btn btn-danger admin-only" id="lr_deleteGroupBtn" style="display:none;" onclick="deleteEntireGroupFromForm()">Delete Entire Request</button>
         </div>
       </div>
     </section>
@@ -587,21 +594,18 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
     <!-- ================= LEAVE DETAILS ================= -->
     <section id="view-leaveDetails" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2>Leave Details</h2><div class="sub">All leave requests and their status</div><div class="divider-motif"></div></div>
+        <div><h2>Leave Details</h2><div class="sub">Click any row to view the full leave request as originally submitted</div><div class="divider-motif"></div></div>
       </div>
       <div class="toolbar">
         <div class="search-box">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="Search by name...">
+          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="Search by name or TC No...">
         </div>
-        <select class="select-pill" id="leaveTypeFilter" onchange="renderLeaveTable()">
-          <option value="">All Types</option>
-        </select>
       </div>
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Category</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>S/N</th><th>TC No</th><th>Leave Category</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
           <tbody id="leaveTbody"></tbody>
         </table>
         </div>
@@ -705,14 +709,14 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       </div>
       <div class="note-box" style="margin-bottom:16px;">
         Paste CSV data below with the header row exactly as shown, one leave record per line:<br>
-        <code>TCNo,Category,Type,Year,StartDate,Days,TicketType,Remark</code><br>
-        Example: <code>3034,Annual Leave,Annual Leave,2004,2004-07-05,48,Company Ticket,</code><br>
-        StartDate must be in <b>YYYY-MM-DD</b> format. TicketType and Remark can be left blank (just leave the comma). Category must be one of: Emergency, Local, Annual Leave. All imported records are saved with status <b>Closed</b> (i.e. already-completed historical leave) so they count toward balances immediately.
+        <code>TCNo,Category,Type,Year,StartDate,Days,TicketType,Remark,GroupID</code><br>
+        Example: <code>3034,Annual Leave,Annual Leave,2004,2004-07-05,48,Company Ticket,,G001</code><br>
+        StartDate must be in <b>YYYY-MM-DD</b> format. TicketType, Remark, and GroupID can all be left blank. Category must be one of: Emergency, Local, Annual Leave. <b>GroupID</b> is optional — give several rows the same GroupID to have them appear together as one combined leave request in Leave Details (e.g. Annual + Eid Al Fitr + Unpaid taken as one trip); leave it blank for a standalone entry. All imported records are saved with status <b>Closed</b> (i.e. already-completed historical leave) so they count toward balances immediately.
       </div>
       <div class="card card-pad">
         <div class="field"><label>CSV Data</label>
-          <textarea id="bi_csvInput" rows="12" style="width:100%; font-family:monospace; font-size:12.5px; padding:10px; border:1.5px solid var(--border); border-radius:10px;" placeholder="TCNo,Category,Type,Year,StartDate,Days,TicketType,Remark
-3034,Annual Leave,Annual Leave,2004,2004-07-05,48,Company Ticket,"></textarea>
+          <textarea id="bi_csvInput" rows="12" style="width:100%; font-family:monospace; font-size:12.5px; padding:10px; border:1.5px solid var(--border); border-radius:10px;" placeholder="TCNo,Category,Type,Year,StartDate,Days,TicketType,Remark,GroupID
+3034,Annual Leave,Annual Leave,2004,2004-07-05,48,Company Ticket,,G001"></textarea>
         </div>
         <div style="display:flex; gap:10px; margin-top:12px;">
           <button class="btn btn-outline" onclick="previewBulkImport()">Preview</button>
@@ -1020,6 +1024,7 @@ const FIXED_LEAVE_RULES = {
 // Air ticket entitlement cycle by staff level
 const LEVEL_TICKET_CYCLE_YEARS = { "Staff": 2, "Manager": 1 };
 let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
+let editingGroupId = null; // null = new request; set = editing an existing submitted group on the Leave Request page
 
 // Groups together leave records that were submitted/imported as one combined trip
 // (e.g. Annual + Eid + Unpaid taken back-to-back), so they can be viewed/edited as a unit.
@@ -1223,9 +1228,15 @@ function showView(name){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const navEl = document.querySelector('.nav-item[data-view="'+name+'"]');
   if(navEl) navEl.classList.add('active');
-  if(name==='leaveRequest') openLeaveRequestPage();
   if(name==='leaveDetails') renderLeaveTable();
   if(name==='leaveApproved') renderLeaveApproved();
+}
+
+// Opens a blank Leave Request form for a brand-new submission.
+function startNewLeaveRequest(){
+  editingGroupId = null;
+  showView('leaveRequest');
+  openLeaveRequestPage();
 }
 
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -1260,7 +1271,7 @@ function accruedAnnualLeave(joiningDate, asOf){
 
 function annualLeaveTakenDays(tcNo){
   return leaveList
-    .filter(l=> l.tcNo===tcNo && l.type==='Annual' && l.status!=='Cancelled')
+    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && l.status!=='Cancelled' && l.status!=='Rejected')
     .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
 }
 
@@ -1525,42 +1536,50 @@ function rowBalanceDisplay(type, asOfDate, year){
 }
 
 
-function matrixRowHTML(rowId, prefillStart){
+function matrixRowHTML(rowId, prefillStart, entry){
   const thisYear = new Date().getFullYear();
-  return `<tr class="matrix-row" data-row-id="${rowId}">
+  const docId = entry?.id || '';
+  let typeOptions = leaveTypeOptionsHTML(entry?.type);
+  if(entry?.type && !activeLeaveTypeNames().includes(entry.type)){
+    typeOptions = `<option value="${entry.type}" selected>${entry.type}</option>` + typeOptions;
+  }
+  return `<tr class="matrix-row" data-row-id="${rowId}" data-doc-id="${docId}">
     <td>
       <select class="mr-type" style="min-width:160px;" onchange="updateRowCalc('${rowId}')">
         <option value="">Select Leave Type</option>
-        ${leaveTypeOptionsHTML()}
+        ${typeOptions}
       </select>
     </td>
     <td class="mr-balance" style="white-space:nowrap;">—</td>
-    <td><input type="number" class="mr-year" placeholder="${thisYear}" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
-    <td><input type="date" class="mr-start" value="${prefillStart||''}" onchange="updateRowCalc('${rowId}')" style="min-width:150px;"></td>
+    <td><input type="number" class="mr-year" placeholder="${thisYear}" value="${entry?.year||''}" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
+    <td><input type="date" class="mr-start" value="${entry?.fromDate || prefillStart || ''}" onchange="updateRowCalc('${rowId}')" style="min-width:150px;"></td>
     <td class="mr-end" style="white-space:nowrap; color:var(--slate);">—</td>
-    <td><input type="number" min="1" class="mr-days" placeholder="Days" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
-    <td><input type="text" class="mr-remark" placeholder="Optional" style="min-width:130px;"></td>
+    <td><input type="number" min="1" class="mr-days" placeholder="Days" value="${entry?.days||''}" oninput="updateRowCalc('${rowId}')" style="width:80px;"></td>
+    <td><input type="text" class="mr-remark" placeholder="Optional" value="${entry?.remark||''}" style="min-width:130px;"></td>
     <td><button type="button" class="btn btn-danger btn-sm" onclick="removeMatrixRow('${rowId}')">✕</button></td>
   </tr>`;
 }
 
-function addMatrixRow(){
+function addMatrixRow(entry){
   matrixRowSeq++;
   const rowId = 'row' + matrixRowSeq;
-  // Auto-chain: new row's Start Date defaults to the day after the previous row's End Date
+  // Auto-chain: a brand-new row's Start Date defaults to the day after the previous row's End Date
   let prefillStart = '';
-  const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
-  if(rows.length>0){
-    const lastRow = rows[rows.length-1];
-    const lastEndIso = lastRow.querySelector('.mr-end').dataset.iso;
-    if(lastEndIso){
-      const next = new Date(lastEndIso);
-      next.setDate(next.getDate()+1);
-      prefillStart = next.toISOString().slice(0,10);
+  if(!entry){
+    const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
+    if(rows.length>0){
+      const lastRow = rows[rows.length-1];
+      const lastEndIso = lastRow.querySelector('.mr-end').dataset.iso;
+      if(lastEndIso){
+        const next = new Date(lastEndIso);
+        next.setDate(next.getDate()+1);
+        prefillStart = next.toISOString().slice(0,10);
+      }
     }
   }
-  document.getElementById('matrixRowsContainer').insertAdjacentHTML('beforeend', matrixRowHTML(rowId, prefillStart));
-  if(prefillStart) updateRowCalc(rowId);
+  document.getElementById('matrixRowsContainer').insertAdjacentHTML('beforeend', matrixRowHTML(rowId, prefillStart, entry));
+  updateRowCalc(rowId);
+  updateBalanceWarningBanner();
   updateOverallDates();
 }
 
@@ -1663,6 +1682,7 @@ function onLrCategoryChange(){
 }
 
 function openLeaveRequestPage(){
+  editingGroupId = null;
   document.getElementById('lr_category').value = '';
   document.getElementById('lr_ticketType').value = 'None';
   document.getElementById('lr_ticketRow').style.display = 'none';
@@ -1682,17 +1702,24 @@ function openLeaveRequestPage(){
   matrixRowSeq = 0;
   addMatrixRow();
   updateOverallDates();
+  applyLeaveRequestEditability();
 }
 
 function cancelLeaveRequest(){
-  openLeaveRequestPage();
-  toast('Form cleared', 'ok');
+  if(editingGroupId){
+    editingGroupId = null;
+    showView('leaveDetails');
+  } else {
+    openLeaveRequestPage();
+    toast('Form cleared', 'ok');
+  }
 }
 
 async function submitLeaveRequest(){
   if(!currentUser) return;
-  const category = document.getElementById('lr_category').value;
   const isAdmin = currentUser.role==='admin';
+  if(editingGroupId && !isAdmin){ toast('You do not have permission to edit this request', 'err'); return; }
+  const category = document.getElementById('lr_category').value;
   const tcNo = isAdmin ? document.getElementById('lr_tcNo').value.trim() : currentUser.tcNo;
   if(!category){ toast('Please select a Leave Category', 'err'); return; }
   if(!tcNo){ toast('Please select a Staff', 'err'); return; }
@@ -1710,8 +1737,9 @@ async function submitLeaveRequest(){
     const days = Number(row.querySelector('.mr-days').value);
     const endIso = row.querySelector('.mr-end').dataset.iso;
     const remark = row.querySelector('.mr-remark').value.trim();
+    const docId = row.dataset.docId || null;
     if(!type || !year || !start || !days || days<=0){ toast('Please fill Leave Type, Year, Start Date and Days for every entry', 'err'); return; }
-    entries.push({ type, year, fromDate: start, toDate: endIso, days, remark });
+    entries.push({ docId, type, year, fromDate: start, toDate: endIso, days, remark });
   }
 
   const exceedCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-exceeds-balance').length;
@@ -1723,19 +1751,50 @@ async function submitLeaveRequest(){
   try{
     const ticketType = (category==='Annual Leave') ? document.getElementById('lr_ticketType').value : 'None';
     const batch = db.batch();
-    entries.forEach(e=>{
-      const ref = db.collection('leaves').doc();
-      batch.set(ref, {
-        tcNo, name: s.name, category, type: e.type,
-        fromDate: e.fromDate, toDate: e.toDate, days: e.days,
-        ticketType,
-        status: isAdmin ? 'Reserved' : 'Pending',
-        remark: e.remark, year: e.year,
-        requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+
+    if(editingGroupId){
+      // Update existing rows in place; delete any that were removed; add any newly-added rows.
+      const originalIds = leaveList.filter(l => (l.groupId||l.id)===editingGroupId).map(l=>l.id);
+      const keptIds = entries.filter(e=>e.docId).map(e=>e.docId);
+      originalIds.filter(id=> !keptIds.includes(id)).forEach(id=> batch.delete(db.collection('leaves').doc(id)));
+      entries.forEach(e=>{
+        if(e.docId){
+          batch.update(db.collection('leaves').doc(e.docId), {
+            tcNo, name: s.name, category, type: e.type,
+            fromDate: e.fromDate, toDate: e.toDate, days: e.days,
+            ticketType, remark: e.remark, year: e.year
+          });
+        } else {
+          const ref = db.collection('leaves').doc();
+          batch.set(ref, {
+            tcNo, name: s.name, category, type: e.type,
+            fromDate: e.fromDate, toDate: e.toDate, days: e.days,
+            ticketType, groupId: editingGroupId,
+            status: isAdmin ? 'Reserved' : 'Pending',
+            remark: e.remark, year: e.year,
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
       });
-    });
-    await batch.commit();
-    toast(isAdmin ? 'Leave request saved' : 'Your leave request has been submitted for approval', 'ok');
+      await batch.commit();
+      toast('Leave request updated — balance recalculated', 'ok');
+      editingGroupId = null;
+    } else {
+      const groupId = newGroupId();
+      entries.forEach(e=>{
+        const ref = db.collection('leaves').doc();
+        batch.set(ref, {
+          tcNo, name: s.name, category, type: e.type,
+          fromDate: e.fromDate, toDate: e.toDate, days: e.days,
+          ticketType, groupId,
+          status: isAdmin ? 'Reserved' : 'Pending',
+          remark: e.remark, year: e.year,
+          requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+      toast(isAdmin ? 'Leave request saved' : 'Your leave request has been submitted for approval', 'ok');
+    }
     showView('leaveDetails');
   }catch(err){ toast('Failed to save: '+err.message, 'err'); }
 }
@@ -2028,50 +2087,124 @@ function renderContracts(){
 /* =========================================================================
    LEAVE RECORDS VIEW
    ========================================================================= */
+// Groups leave records that were submitted together as one request (same groupId) so they
+// can be shown/edited as a single unit. Legacy records without a groupId are their own group.
+function computeLeaveGroups(list){
+  const map = {};
+  list.forEach(l=>{
+    const gid = l.groupId || l.id;
+    if(!map[gid]) map[gid] = { groupId: gid, tcNo: l.tcNo, name: l.name, category: l.category, entries: [] };
+    map[gid].entries.push(l);
+  });
+  return Object.values(map).map(g=>{
+    const starts = g.entries.map(e=> new Date(e.fromDate).getTime());
+    const ends = g.entries.map(e=> new Date(e.toDate).getTime());
+    const statuses = [...new Set(g.entries.map(e=>e.status))];
+    const reqTimes = g.entries.map(e=> e.requestedAt?.seconds || 0);
+    return {
+      ...g,
+      minStart: new Date(Math.min(...starts)).toISOString().slice(0,10),
+      maxEnd: new Date(Math.max(...ends)).toISOString().slice(0,10),
+      status: statuses.length===1 ? statuses[0] : 'Mixed',
+      requestedAtSeconds: Math.max(...reqTimes)
+    };
+  });
+}
+
 function renderLeaveTable(){
   if(!currentUser) return;
   const q = (document.getElementById('leaveSearch')?.value||'').toLowerCase();
-  const typeF = document.getElementById('leaveTypeFilter')?.value||'';
 
-  // populate type filter (all known types, including inactive ones, so historical records stay filterable)
-  const typeSel = document.getElementById('leaveTypeFilter');
-  const prevTypeVal = typeSel.value;
-  typeSel.innerHTML = '<option value="">All Types</option>' + leaveTypesList.map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
-  typeSel.value = prevTypeVal;
+  // S/N is a PERMANENT serial number based on creation order across ALL leave requests —
+  // it must not shift when searching/filtering or when new requests are added elsewhere.
+  const allGroups = computeLeaveGroups(leaveList);
+  allGroups.sort((a,b)=> a.requestedAtSeconds - b.requestedAtSeconds);
+  const serialMap = {};
+  allGroups.forEach((g,i)=> serialMap[g.groupId] = i+1);
 
   let list = [...leaveList];
   if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
-  if(typeF) list = list.filter(l=>l.type===typeF);
-  if(q) list = list.filter(l=> l.name.toLowerCase().includes(q));
+  if(q) list = list.filter(l=> l.name.toLowerCase().includes(q) || l.tcNo.toLowerCase().includes(q));
 
   const tbody = document.getElementById('leaveTbody');
   if(!tbody) return;
-  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No records found</td></tr>'; return; }
 
+  let groups = computeLeaveGroups(list);
+  groups.sort((a,b)=> new Date(b.minStart) - new Date(a.minStart) || b.requestedAtSeconds - a.requestedAtSeconds);
+
+  if(groups.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:30px;">No records found</td></tr>'; return; }
+
+  tbody.innerHTML = groups.map(g=>`<tr style="cursor:pointer;" onclick="openLeaveGroupDetail('${g.groupId}')">
+      <td>${serialMap[g.groupId]}</td><td>${g.tcNo}</td><td>${g.category||'—'}</td>
+      <td>${fmtDate(g.minStart)}</td><td>${fmtDate(g.maxEnd)}</td>
+      <td>${statusBadge(g.status)}</td>
+    </tr>`).join('');
+}
+
+// Opens the full leave request (all leave-type entries submitted together) exactly as it
+// was originally saved. Admin gets Edit/Delete per line plus a "Delete Entire Request" option;
+// normal users get a read-only view.
+// Opens the full Leave Request page (same page used to create a request) pre-filled with a
+// previously submitted group's entries, so it can be reviewed — and by Admin, edited — with
+// every function of that page (Add Matrix, Ticket Type, balance checks, Print) intact.
+function openLeaveGroupDetail(groupId){
+  const entries = leaveList.filter(l => (l.groupId || l.id) === groupId)
+    .sort((a,b)=> new Date(a.fromDate) - new Date(b.fromDate));
+  if(entries.length===0) return;
+  const first = entries[0];
   const isAdmin = currentUser.role==='admin';
-  tbody.innerHTML = list.map(l=>{
-    let actions = '';
-    if(isAdmin){
-      if(l.status==='Pending'){
-        actions = `<button class="btn btn-gold btn-sm" onclick="approveLeave('${l.id}')">Approve</button> <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button>`;
-      } else if(l.status==='Reserved'){
-        actions = `<button class="btn btn-outline btn-sm" onclick="startLeave('${l.id}')">Start</button> <button class="btn btn-ghost btn-sm" onclick="cancelLeave('${l.id}')">Cancel</button>`;
-      } else if(l.status==='On Leave'){
-        actions = `<button class="btn btn-gold btn-sm" onclick="openCloseModal('${l.id}')">Close / Return</button>`;
-      } else {
-        actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
-      }
-      actions += ` <button class="btn btn-outline btn-sm" onclick="openEditLeaveModal('${l.id}')">Edit</button>`;
-    } else {
-      actions = `<span style="color:var(--slate-light); font-size:12px;">—</span>`;
-    }
-    return `<tr>
-      <td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
-      <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
-      <td>${statusBadge(l.status)}</td>
-      <td>${actions}</td>
-    </tr>`;
-  }).join('');
+  editingGroupId = groupId;
+
+  showView('leaveRequest');
+  document.getElementById('lr_category').value = first.category || '';
+  onLrCategoryChange();
+
+  const tcInput = document.getElementById('lr_tcNo');
+  const nameInput = document.getElementById('lr_staffName');
+  tcInput.value = first.tcNo;
+  tcInput.readOnly = true; // reassigning staff on an existing request isn't supported — delete & recreate instead
+  nameInput.value = first.name;
+
+  const ticketEntry = entries.find(e=>e.ticketType && e.ticketType!=='None');
+  document.getElementById('lr_ticketType').value = ticketEntry ? ticketEntry.ticketType : 'None';
+
+  document.getElementById('matrixRowsContainer').innerHTML = '';
+  matrixRowSeq = 0;
+  entries.forEach(e => addMatrixRow(e));
+  updateOverallDates();
+
+  applyLeaveRequestEditability();
+  if(!isAdmin) toast('Viewing your leave request (read-only)', 'ok');
+}
+
+// Locks down the Leave Request page to read-only when a non-admin is viewing an already-
+// submitted request. Admins always get full edit access, including when editing a group.
+function applyLeaveRequestEditability(){
+  const isAdmin = currentUser.role==='admin';
+  const readOnly = !!editingGroupId && !isAdmin;
+  document.getElementById('lr_category').disabled = readOnly;
+  document.getElementById('lr_ticketType').disabled = readOnly;
+  document.querySelectorAll('#matrixRowsContainer .mr-type, #matrixRowsContainer .mr-year, #matrixRowsContainer .mr-start, #matrixRowsContainer .mr-days, #matrixRowsContainer .mr-remark').forEach(el=> el.disabled = readOnly);
+  document.querySelectorAll('#matrixRowsContainer .matrix-row td:last-child button').forEach(el=> el.style.display = readOnly ? 'none' : '');
+  document.getElementById('lr_addMatrixBtn').style.display = readOnly ? 'none' : '';
+  document.getElementById('lr_saveBtn').style.display = readOnly ? 'none' : '';
+  document.getElementById('lr_cancelBtn').textContent = editingGroupId ? 'Back' : 'Cancel';
+  document.getElementById('lr_deleteGroupBtn').style.display = (editingGroupId && isAdmin) ? '' : 'none';
+}
+
+async function deleteEntireGroupFromForm(){
+  if(!editingGroupId) return;
+  const entries = leaveList.filter(l => (l.groupId || l.id) === editingGroupId);
+  if(entries.length===0) return;
+  if(!confirm(`Delete this entire leave request (${entries.length} entr${entries.length===1?'y':'ies'})? This cannot be undone.`)) return;
+  try{
+    const batch = db.batch();
+    entries.forEach(l=> batch.delete(db.collection('leaves').doc(l.id)));
+    await batch.commit();
+    toast('Leave request deleted — balance recalculated', 'ok');
+    editingGroupId = null;
+    showView('leaveDetails');
+  }catch(err){ toast('Delete failed: '+err.message, 'err'); }
 }
 
 function renderLeaveApproved(){
@@ -2434,8 +2567,8 @@ function parseBulkCsv(text){
   lines.forEach((line, i)=>{
     const parts = line.split(',').map(p=>p.trim());
     if(parts.length<6){ errors.push(`Line ${i+1}: not enough columns`); return; }
-    const [tcNo, category, type, year, startDate, days, ticketType, ...remarkParts] = parts;
-    const remark = remarkParts.join(',');
+    const [tcNo, category, type, year, startDate, days, ticketType, remarkRaw, groupIdRaw] = parts;
+    const remark = remarkRaw || '';
     const s = staffList.find(x=>x.tcNo===tcNo);
     if(!s){ errors.push(`Line ${i+1}: TC No "${tcNo}" not found in Staff Directory`); return; }
     if(!LEAVE_CATEGORIES.includes(category)){ errors.push(`Line ${i+1}: Category must be Emergency, Local, or Annual Leave (got "${category}")`); return; }
@@ -2450,7 +2583,7 @@ function parseBulkCsv(text){
       year: Number(year) || new Date(startDate).getFullYear(),
       fromDate: startDate, toDate: endDate.toISOString().slice(0,10), days: daysNum,
       ticketType: (ticketType && ticketType!=='') ? ticketType : 'None',
-      remark: remark || ''
+      remark, groupId: (groupIdRaw && groupIdRaw!=='') ? groupIdRaw : null
     });
   });
   return { rows, errors };
@@ -2495,6 +2628,7 @@ async function runBulkImport(){
           tcNo: r.tcNo, name: r.name, category: r.category, type: r.type,
           fromDate: r.fromDate, toDate: r.toDate, days: r.days,
           ticketType: r.ticketType, status: 'Closed', remark: r.remark, year: r.year,
+          groupId: r.groupId || newGroupId(),
           actualReturnDate: r.toDate,
           requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
           closedAt: firebase.firestore.FieldValue.serverTimestamp()
