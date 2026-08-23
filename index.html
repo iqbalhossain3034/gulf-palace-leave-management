@@ -1271,9 +1271,9 @@ function accruedAnnualLeave(joiningDate, asOf){
   return CFG.fiveYearDays*perDayBefore + (tenureDays - CFG.fiveYearDays)*perDayAfter;
 }
 
-function annualLeaveTakenDays(tcNo){
+function annualLeaveTakenDays(tcNo, excludeGroupId){
   return leaveList
-    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && l.status!=='Cancelled' && l.status!=='Rejected')
+    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && l.status!=='Cancelled' && l.status!=='Rejected' && (!excludeGroupId || (l.groupId||l.id)!==excludeGroupId))
     .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
 }
 
@@ -1304,11 +1304,14 @@ function ticketCycleYearsForStaff(staff){
 function computeTicketPeriods(staff){
   const cycleYears = ticketCycleYearsForStaff(staff);
   const today = new Date();
-  // Ticket usage is derived directly from completed (Closed) Annual Leave records that had a
-  // ticket type selected — this covers both live app usage and bulk-imported history, with a
-  // single source of truth (no separate log to keep in sync).
+  // Ticket usage is derived directly from Annual Leave records that have been approved
+  // (Reserved / On Leave / Closed — i.e. anything past Pending) and had a ticket type
+  // selected. This covers live app usage and bulk-imported history with a single source
+  // of truth — a ticket counts as "Used" as soon as it's approved, not only once the leave
+  // is fully closed on return.
+  const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
   const usageEvents = leaveList
-    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType && l.ticketType!=='None' && l.status==='Closed')
+    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType && l.ticketType!=='None' && APPROVED_STATUSES.includes(l.status))
     .map(l=> ({ date: l.fromDate, type: l.ticketType }));
   const periods = [];
   let periodStart = new Date(staff.joiningDate);
@@ -1496,9 +1499,9 @@ function currentLeaveRequestStaff(){
 }
 
 // Days already taken/reserved for a given leave type, optionally scoped to one year.
-function fixedLeaveTakenDays(tcNo, type, year){
+function fixedLeaveTakenDays(tcNo, type, year, excludeGroupId){
   return leaveList
-    .filter(l=> l.tcNo===tcNo && l.type===type && l.status!=='Cancelled' && l.status!=='Rejected' && (year ? Number(l.year)===Number(year) : true))
+    .filter(l=> l.tcNo===tcNo && l.type===type && l.status!=='Cancelled' && l.status!=='Rejected' && (year ? Number(l.year)===Number(year) : true) && (!excludeGroupId || (l.groupId||l.id)!==excludeGroupId))
     .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
 }
 // Entitlement for one specific year (0 if the staff wasn't yet eligible that year).
@@ -1529,20 +1532,23 @@ function rowBalanceDisplay(type, asOfDate, year){
   const staff = currentLeaveRequestStaff();
   if(!staff || !type) return '—';
 
+  // When viewing/editing an already-submitted request, exclude its own entries from the
+  // "taken" count — otherwise the balance would show the request subtracting itself,
+  // showing 0 instead of the real balance that was available when it was made.
   if(type==='Annual Leave'){
     const accrued = accruedAnnualLeave(staff.joiningDate, asOfDate || todayISO());
-    const taken = annualLeaveTakenDays(staff.tcNo);
+    const taken = annualLeaveTakenDays(staff.tcNo, editingGroupId);
     return (accrued - taken).toFixed(1);
   }
 
   if(FIXED_LEAVE_RULES[type]){
     if(year){
       const entitlement = fixedLeaveEntitlementForYear(type, staff, Number(year));
-      const taken = fixedLeaveTakenDays(staff.tcNo, type, Number(year));
+      const taken = fixedLeaveTakenDays(staff.tcNo, type, Number(year), editingGroupId);
       return (entitlement - taken).toFixed(0);
     }
     const entitlement = fixedLeaveEntitlementTotal(type, staff);
-    const taken = fixedLeaveTakenDays(staff.tcNo, type, null);
+    const taken = fixedLeaveTakenDays(staff.tcNo, type, null, editingGroupId);
     return (entitlement - taken).toFixed(0);
   }
 
@@ -2065,9 +2071,10 @@ function openStaffDetail(tcNo){
     </div>
 
     <div class="section-title">Leave History (${hist.length})</div>
+    <div class="note-box" style="margin-bottom:10px;">A ticket only counts as "Used" in Air Ticket History above when a record here is <b>Annual Leave</b>, Status = <b>Closed</b>, and Ticket is not "None".</div>
     <div class="tbl-wrap" style="max-height:260px; overflow-y:auto;">
-    <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
-    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center; color:var(--slate);">No records</td></tr>'}</tbody>
+    <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Ticket</th></tr></thead>
+    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td><td>${(l.ticketType&&l.ticketType!=='None')?`<span class="badge badge-info">${l.ticketType}</span>`:'—'}</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center; color:var(--slate);">No records</td></tr>'}</tbody>
     </table>
     </div>
   `;
