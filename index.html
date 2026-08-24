@@ -158,11 +158,12 @@ body.role-staff .admin-only{ display:none !important; }
 .divider-motif{ height:2px; width:64px; margin-top:8px; background:linear-gradient(90deg,var(--gold),transparent); border-radius:2px;}
 
 .grid{ display:grid; gap:18px; }
+.grid-5{ grid-template-columns:repeat(5,1fr); }
 .grid-4{ grid-template-columns:repeat(4,1fr); }
 .grid-3{ grid-template-columns:repeat(3,1fr); }
 .grid-2{ grid-template-columns:repeat(2,1fr); }
-@media (max-width:1180px){ .grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);} }
-@media (max-width:760px){ .grid-4,.grid-3,.grid-2{grid-template-columns:1fr;} .shell{grid-template-columns:1fr;} .sidebar{position:relative; height:auto;} }
+@media (max-width:1180px){ .grid-5{grid-template-columns:repeat(3,1fr);} .grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:760px){ .grid-5,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;} .shell{grid-template-columns:1fr;} .sidebar{position:relative; height:auto;} }
 
 .card{ background:var(--white); border:1px solid var(--border-soft); border-radius:var(--radius); box-shadow:var(--shadow); }
 .card-pad{ padding:20px 22px; }
@@ -398,6 +399,36 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
             </div>
           </div>
         </div>
+
+        <div class="section-title" style="margin-bottom:10px;">Leave Summary</div>
+        <div class="grid grid-5" style="margin-bottom:18px;">
+          <div class="card stat-card">
+            <div class="lbl">Leave Taken</div>
+            <div class="val" id="sumLeaveTakenVal">0</div>
+            <div class="cap">Annual Leave days used</div>
+          </div>
+          <div class="card stat-card">
+            <div class="lbl">Leave Balance</div>
+            <div class="val" id="sumLeaveBalanceVal">0</div>
+            <div class="cap">Annual Leave days remaining</div>
+          </div>
+          <div class="card stat-card">
+            <div class="lbl">Total Unpaid Leave</div>
+            <div class="val" id="sumUnpaidVal">0</div>
+            <div class="cap">All-time days</div>
+          </div>
+          <div class="card stat-card">
+            <div class="lbl">Total Sick Leave</div>
+            <div class="val" id="sumSickTotalVal">0</div>
+            <div class="cap">All-time days</div>
+          </div>
+          <div class="card stat-card">
+            <div class="lbl">Current Year Sick Leave</div>
+            <div class="val" id="sumSickYearVal">0</div>
+            <div class="cap" id="sumSickYearCap">This year's days</div>
+          </div>
+        </div>
+
         <div class="card card-pad">
           <div class="section-title">My Leave History</div>
           <div class="tbl-wrap">
@@ -467,7 +498,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>TC No</th><th>Name</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Remark</th><th>Action</th></tr></thead>
+          <thead><tr><th>S/N</th><th>TC No</th><th>Leave Category</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
           <tbody id="approvalsTbody"></tbody>
         </table>
         </div>
@@ -1026,6 +1057,7 @@ const FIXED_LEAVE_RULES = {
 const LEVEL_TICKET_CYCLE_YEARS = { "Staff": 2, "Manager": 1 };
 let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
 let editingGroupId = null; // null = new request; set = editing an existing submitted group on the Leave Request page
+let editingGroupOrigin = 'leaveDetails'; // which page to return to after viewing/approving a group: 'leaveDetails' or 'approvals'
 
 // Groups together leave records that were submitted/imported as one combined trip
 // (e.g. Annual + Eid + Unpaid taken back-to-back), so they can be viewed/edited as a unit.
@@ -1232,6 +1264,7 @@ function showView(name){
   if(navEl) navEl.classList.add('active');
   if(name==='leaveDetails') renderLeaveTable();
   if(name==='leaveApproved') renderLeaveApproved();
+  if(name==='approvals') renderApprovals();
 }
 
 // Opens a blank Leave Request form for a brand-new submission.
@@ -1480,6 +1513,15 @@ function renderMyLeaveHome(){
   document.getElementById('myTicketVal').textContent = ti.due?ti.totalDue+' DUE':ti.daysLeft+'d';
   document.getElementById('myTicketSub').textContent = ti.due ? ti.totalDue+' ticket(s) due now' : 'Next: ' + fmtDate(ti.nextDue);
 
+  // ===== Leave Summary cards =====
+  const thisYear = new Date().getFullYear();
+  document.getElementById('sumLeaveTakenVal').textContent = b.taken.toFixed(0);
+  document.getElementById('sumLeaveBalanceVal').textContent = b.balance.toFixed(0);
+  document.getElementById('sumUnpaidVal').textContent = fixedLeaveTakenDays(s.tcNo, 'Unpaid Leave', null, null).toFixed(0);
+  document.getElementById('sumSickTotalVal').textContent = fixedLeaveTakenDays(s.tcNo, 'Sick Leave', null, null).toFixed(0);
+  document.getElementById('sumSickYearVal').textContent = fixedLeaveTakenDays(s.tcNo, 'Sick Leave', thisYear, null).toFixed(0);
+  document.getElementById('sumSickYearCap').textContent = thisYear + "'s days";
+
   const hist = leaveList.filter(l=>l.tcNo===currentUser.tcNo).sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
   const tbody = document.getElementById('myLeaveTbody');
   tbody.innerHTML = hist.length ? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('')
@@ -1707,6 +1749,7 @@ function onLrCategoryChange(){
 
 function openLeaveRequestPage(){
   editingGroupId = null;
+  editingGroupOrigin = 'leaveDetails';
   document.getElementById('lr_category').value = '';
   document.getElementById('lr_ticketType').value = 'None';
   document.getElementById('lr_ticketRow').style.display = 'none';
@@ -1732,7 +1775,7 @@ function openLeaveRequestPage(){
 function cancelLeaveRequest(){
   if(editingGroupId){
     editingGroupId = null;
-    showView('leaveDetails');
+    showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
   } else {
     openLeaveRequestPage();
     toast('Form cleared', 'ok');
@@ -1819,34 +1862,62 @@ async function submitLeaveRequest(){
       await batch.commit();
       toast(isAdmin ? 'Leave request saved' : 'Your leave request has been submitted for approval', 'ok');
     }
-    showView('leaveDetails');
+    showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
   }catch(err){ toast('Failed to save: '+err.message, 'err'); }
 }
 
+// Approvals page shows ONE row per complete Leave Request (same grouping model as Leave
+// Details) rather than one row per individual leave-type entry. Clicking a row opens the
+// full original Leave Request Form — Approve/Reject live inside that form, not on the row.
 function renderApprovals(){
   if(!currentUser || currentUser.role!=='admin') return;
-  const pending = leaveList.filter(l=>l.status==='Pending').sort((a,b)=> new Date(a.fromDate)-new Date(b.fromDate));
+  const pendingEntries = leaveList.filter(l=>l.status==='Pending');
   const badge = document.getElementById('pendingCountBadge');
-  if(pending.length>0){ badge.textContent = pending.length; badge.style.display='inline-flex'; } else { badge.style.display='none'; }
+  if(pendingEntries.length>0){ badge.textContent = pendingEntries.length; badge.style.display='inline-flex'; } else { badge.style.display='none'; }
+
+  const serialMap = computeGroupSerialMap();
+  const groups = computeLeaveGroups(pendingEntries);
+  groups.sort((a,b)=> a.requestedAtSeconds - b.requestedAtSeconds);
 
   const tbody = document.getElementById('approvalsTbody');
-  if(pending.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No pending requests</td></tr>'; return; }
-  tbody.innerHTML = pending.map(l=>`<tr>
-    <td>${l.tcNo}</td><td>${l.name}</td><td>${l.type}</td>
-    <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
-    <td>${l.remark||'—'}</td>
-    <td><button class="btn btn-gold btn-sm" onclick="approveLeave('${l.id}')">Approve</button> <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button></td>
-  </tr>`).join('');
+  if(groups.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:30px;">No pending requests</td></tr>'; return; }
+  tbody.innerHTML = groups.map(g=>`<tr style="cursor:pointer;" onclick="openApprovalGroupDetail('${g.groupId}')">
+      <td>${serialMap[g.groupId]}</td><td>${g.tcNo}</td><td>${g.category||'—'}</td>
+      <td>${fmtDate(g.minStart)}</td><td>${fmtDate(g.maxEnd)}</td>
+      <td>${statusBadge(g.status)}</td>
+    </tr>`).join('');
 }
 
-async function approveLeave(id){
-  try{ await db.collection('leaves').doc(id).update({ status:'Reserved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() }); toast('Approved','ok'); }
-  catch(err){ toast('Failed: '+err.message,'err'); }
+// Opens the complete Leave Request Form for a pending request selected from the Approvals
+// page — identical to opening it from Leave Details, but returns to Approvals afterward.
+function openApprovalGroupDetail(groupId){
+  openLeaveGroupDetail(groupId, 'approvals');
 }
-async function rejectLeave(id){
-  if(!confirm('Reject this leave request?')) return;
-  try{ await db.collection('leaves').doc(id).update({ status:'Rejected' }); toast('Cancelled','ok'); }
-  catch(err){ toast('Failed: '+err.message,'err'); }
+
+async function approveLeaveGroup(groupId){
+  const entries = leaveList.filter(l => (l.groupId||l.id) === groupId);
+  if(entries.length===0) return;
+  try{
+    const batch = db.batch();
+    entries.forEach(l=> batch.update(db.collection('leaves').doc(l.id), { status:'Reserved', approvedAt: firebase.firestore.FieldValue.serverTimestamp() }));
+    await batch.commit();
+    toast('Leave request approved','ok');
+    editingGroupId = null;
+    showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
+  }catch(err){ toast('Failed: '+err.message,'err'); }
+}
+async function rejectLeaveGroup(groupId){
+  if(!confirm('Reject this entire leave request?')) return;
+  const entries = leaveList.filter(l => (l.groupId||l.id) === groupId);
+  if(entries.length===0) return;
+  try{
+    const batch = db.batch();
+    entries.forEach(l=> batch.update(db.collection('leaves').doc(l.id), { status:'Rejected' }));
+    await batch.commit();
+    toast('Leave request rejected','ok');
+    editingGroupId = null;
+    showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
+  }catch(err){ toast('Failed: '+err.message,'err'); }
 }
 
 /* =========================================================================
@@ -2136,16 +2207,22 @@ function computeLeaveGroups(list){
   });
 }
 
-function renderLeaveTable(){
-  if(!currentUser) return;
-  const q = (document.getElementById('leaveSearch')?.value||'').toLowerCase();
-
-  // S/N is a PERMANENT serial number based on creation order across ALL leave requests —
-  // it must not shift when searching/filtering or when new requests are added elsewhere.
+// S/N is a PERMANENT serial number based on creation order across ALL leave requests —
+// it must not shift when searching/filtering, when new requests are added elsewhere, or
+// depending on which page (Leave Details vs Approvals) is displaying the request.
+function computeGroupSerialMap(){
   const allGroups = computeLeaveGroups(leaveList);
   allGroups.sort((a,b)=> a.requestedAtSeconds - b.requestedAtSeconds);
   const serialMap = {};
   allGroups.forEach((g,i)=> serialMap[g.groupId] = i+1);
+  return serialMap;
+}
+
+function renderLeaveTable(){
+  if(!currentUser) return;
+  const q = (document.getElementById('leaveSearch')?.value||'').toLowerCase();
+
+  const serialMap = computeGroupSerialMap();
 
   let list = [...leaveList];
   if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
@@ -2172,13 +2249,14 @@ function renderLeaveTable(){
 // Opens the full Leave Request page (same page used to create a request) pre-filled with a
 // previously submitted group's entries, so it can be reviewed — and by Admin, edited — with
 // every function of that page (Add Matrix, Ticket Type, balance checks, Print) intact.
-function openLeaveGroupDetail(groupId){
+function openLeaveGroupDetail(groupId, origin){
   const entries = leaveList.filter(l => (l.groupId || l.id) === groupId)
     .sort((a,b)=> new Date(a.fromDate) - new Date(b.fromDate));
   if(entries.length===0) return;
   const first = entries[0];
   const isAdmin = currentUser.role==='admin';
   editingGroupId = groupId;
+  editingGroupOrigin = origin || 'leaveDetails';
 
   showView('leaveRequest');
   document.getElementById('lr_category').value = first.category || '';
@@ -2199,6 +2277,7 @@ function openLeaveGroupDetail(groupId){
   updateOverallDates();
 
   applyLeaveRequestEditability();
+  updateLrStatusPanel(groupId);
   if(!isAdmin) toast('Viewing your leave request (read-only)', 'ok');
 }
 
@@ -2217,6 +2296,31 @@ function applyLeaveRequestEditability(){
   document.getElementById('lr_deleteGroupBtn').style.display = (editingGroupId && isAdmin) ? '' : 'none';
 }
 
+// Shows the current status of a submitted request at the top of the Leave Request Form, and
+// — for admins only, while the request is still Pending — the Approve / Reject actions that
+// apply to the complete request as a whole (not to individual leave-type rows within it).
+function updateLrStatusPanel(groupId){
+  const panel = document.getElementById('lr_statusPanel');
+  const body = document.getElementById('lr_statusPanelBody');
+  const isAdmin = currentUser.role==='admin';
+  if(!isAdmin || !groupId){ panel.style.display = 'none'; return; }
+
+  const entries = leaveList.filter(l => (l.groupId || l.id) === groupId);
+  if(entries.length===0){ panel.style.display = 'none'; return; }
+  const statuses = [...new Set(entries.map(e=>e.status))];
+  const groupStatus = statuses.length===1 ? statuses[0] : 'Mixed';
+
+  let html = `<div style="margin-bottom:12px;">Current Status: ${statusBadge(groupStatus)}</div>`;
+  if(groupStatus==='Pending'){
+    html += `<div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-gold" onclick="approveLeaveGroup('${groupId}')">Approve</button>
+      <button class="btn btn-danger" onclick="rejectLeaveGroup('${groupId}')">Reject</button>
+    </div>`;
+  }
+  body.innerHTML = html;
+  panel.style.display = '';
+}
+
 async function deleteEntireGroupFromForm(){
   if(!editingGroupId) return;
   const entries = leaveList.filter(l => (l.groupId || l.id) === editingGroupId);
@@ -2228,7 +2332,7 @@ async function deleteEntireGroupFromForm(){
     await batch.commit();
     toast('Leave request deleted — balance recalculated', 'ok');
     editingGroupId = null;
-    showView('leaveDetails');
+    showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
   }catch(err){ toast('Delete failed: '+err.message, 'err'); }
 }
 
