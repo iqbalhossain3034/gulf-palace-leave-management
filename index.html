@@ -574,24 +574,26 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
           </div>
         </div>
 
-        <div class="form-row" id="lr_ticketRow" style="display:none;">
+        <div id="lr_ticketRow" style="display:none;">
           <div class="field">
             <label>Air Ticket *</label>
-            <select id="lr_ticketType">
+            <select id="lr_ticketType" style="width:100%;">
               <option value="None">Not using an air ticket for this leave</option>
               <option value="Self Ticket">Self Ticket — I will buy my own ticket</option>
               <option value="Company Ticket">Company Ticket — Company provides the ticket</option>
+              <option value="Employee of the Year">Employee of the Year — Complimentary award ticket</option>
             </select>
           </div>
-          <div class="field">
-            <div class="note-box" style="margin-top:22px;">If a ticket option is chosen, it will be deducted from the staff's air ticket entitlement once this leave is closed on return.</div>
-          </div>
+          <div class="note-box" style="margin-top:8px;">If a ticket option is chosen, it will be deducted from the staff's air ticket entitlement once this leave is closed on return.</div>
         </div>
 
         <div class="form-row c3" style="margin-top:6px;">
-          <div class="field"><label>Overall Start Date</label><input type="text" id="lr_overallStart" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
-          <div class="field"><label>Overall End Date</label><input type="text" id="lr_overallEnd" readonly placeholder="Auto from entries below" style="background:#F0ECE1;"></div>
-          <div class="field"><label>Total Days</label><input type="text" id="lr_totalDays" readonly placeholder="0" style="background:#F0ECE1; font-weight:700;"></div>
+          <input type="hidden" id="lr_overallStart">
+          <input type="hidden" id="lr_overallEnd">
+          <input type="hidden" id="lr_totalDays">
+        </div>
+        <div style="margin-top:6px; padding:16px 18px; background:#F7F3E8; border:1.5px solid var(--border); border-radius:10px; font-family:'Playfair Display',serif; font-size:16px; color:var(--ink); font-weight:600; letter-spacing:.2px; line-height:1.6;">
+          I WISH TO APPLY FOR ( <span id="lr_overallDaysText">0 DAYS</span> ) FROM&nbsp;&nbsp;&nbsp;<span id="lr_overallStartText">—</span>&nbsp;&nbsp;&nbsp;TO :&nbsp;&nbsp;<span id="lr_overallEndText">—</span>&nbsp;&nbsp;AS DETAILED BELOW :
         </div>
 
         <div class="warn-box" id="lr_balanceWarning" style="display:none; margin-top:12px;"></div>
@@ -960,7 +962,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       </div>
       <div class="form-row">
         <div class="field"><label>Ticket Type</label>
-          <select id="el_ticketType"><option value="None">None</option><option value="Self Ticket">Self Ticket</option><option value="Company Ticket">Company Ticket</option></select>
+          <select id="el_ticketType"><option value="None">None</option><option value="Self Ticket">Self Ticket</option><option value="Company Ticket">Company Ticket</option><option value="Employee of the Year">Employee of the Year</option></select>
         </div>
         <div class="field"><label>Status</label>
           <select id="el_status"><option>Pending</option><option>Reserved</option><option>On Leave</option><option>Closed</option><option>Cancelled</option><option>Rejected</option></select>
@@ -1723,6 +1725,13 @@ function updateOverallDates(){
   if(startBox) startBox.value = minStart ? fmtDDMMYYYY(minStart) : '';
   if(endBox) endBox.value = maxEnd ? fmtDDMMYYYY(maxEnd) : '';
   if(totalBox) totalBox.value = totalDays + (totalDays===1 ? ' day' : ' days');
+
+  const daysText = document.getElementById('lr_overallDaysText');
+  const startText = document.getElementById('lr_overallStartText');
+  const endText = document.getElementById('lr_overallEndText');
+  if(daysText) daysText.textContent = totalDays + (totalDays===1 ? ' DAY' : ' DAYS');
+  if(startText) startText.textContent = minStart ? fmtDDMMYYYY(minStart) : '—';
+  if(endText) endText.textContent = maxEnd ? fmtDDMMYYYY(maxEnd) : '—';
 }
 function fmtDDMMYYYY(dateObj){
   const iso = dateObj.toISOString().slice(0,10);
@@ -1744,7 +1753,7 @@ function onLrTcNoChange(){
 
 function onLrCategoryChange(){
   const category = document.getElementById('lr_category').value;
-  document.getElementById('lr_ticketRow').style.display = category==='Annual Leave' ? 'flex' : 'none';
+  document.getElementById('lr_ticketRow').style.display = category==='Annual Leave' ? 'block' : 'none';
 }
 
 function openLeaveRequestPage(){
