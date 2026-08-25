@@ -652,7 +652,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>S/N</th><th>Name</th><th>Category</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th></tr></thead>
+          <thead><tr><th>S/N</th><th>Name</th><th>TC No</th><th>Leave Category</th><th>Start Date</th><th>End Date</th><th>Total Days</th><th>Status</th></tr></thead>
           <tbody id="leaveApprovedTbody"></tbody>
         </table>
         </div>
@@ -2344,20 +2344,28 @@ async function deleteEntireGroupFromForm(){
   }catch(err){ toast('Delete failed: '+err.message, 'err'); }
 }
 
+// Shows one row per fully-approved leave request (same grouping model as Leave Details),
+// using the SAME permanent S/N assigned when the request was originally submitted — so a
+// request's serial number never changes as it moves from Approvals -> Leave Approved.
 function renderLeaveApproved(){
   if(!currentUser) return;
   const tbody = document.getElementById('leaveApprovedTbody');
   if(!tbody) return;
   const approvedStatuses = ['Reserved','On Leave','Closed'];
-  let list = leaveList.filter(l=>approvedStatuses.includes(l.status));
-  if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
-  list = [...list].sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
 
-  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No approved leave records yet</td></tr>'; return; }
-  tbody.innerHTML = list.map((l,i)=>`<tr>
-      <td>${i+1}</td><td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
-      <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
-      <td>${statusBadge(l.status)}</td>
+  const serialMap = computeGroupSerialMap();
+
+  let list = [...leaveList];
+  if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
+
+  let groups = computeLeaveGroups(list).filter(g=> approvedStatuses.includes(g.status));
+  groups.sort((a,b)=> new Date(b.minStart)-new Date(a.minStart) || b.requestedAtSeconds - a.requestedAtSeconds);
+
+  if(groups.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No approved leave records yet</td></tr>'; return; }
+  tbody.innerHTML = groups.map(g=>`<tr style="cursor:pointer;" onclick="openLeaveGroupDetail('${g.groupId}')">
+      <td>${serialMap[g.groupId]}</td><td>${g.name}</td><td>${g.tcNo}</td><td>${g.category||'—'}</td>
+      <td>${fmtDate(g.minStart)}</td><td>${fmtDate(g.maxEnd)}</td><td>${g.totalDays}</td>
+      <td>${statusBadge(g.status)}</td>
     </tr>`).join('');
 }
 
