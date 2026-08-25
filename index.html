@@ -637,7 +637,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>S/N</th><th>TC No</th><th>Leave Category</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
+          <thead><tr><th>S/N</th><th>TC No</th><th>Leave Category</th><th>Start Date</th><th>End Date</th><th>Total Days</th><th>Status</th></tr></thead>
           <tbody id="leaveTbody"></tbody>
         </table>
         </div>
@@ -652,7 +652,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Category</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th></tr></thead>
+          <thead><tr><th>S/N</th><th>Name</th><th>Category</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th></tr></thead>
           <tbody id="leaveApprovedTbody"></tbody>
         </table>
         </div>
@@ -1770,6 +1770,7 @@ function openLeaveRequestPage(){
   addMatrixRow();
   updateOverallDates();
   applyLeaveRequestEditability();
+  document.getElementById('lr_statusPanel').style.display = 'none';
 }
 
 function cancelLeaveRequest(){
@@ -1903,7 +1904,9 @@ async function approveLeaveGroup(groupId){
     await batch.commit();
     toast('Leave request approved','ok');
     editingGroupId = null;
-    showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
+    // Always land on Leave Details after approving so the admin can immediately see the
+    // now-approved request there, regardless of which page the approval was opened from.
+    showView('leaveDetails');
   }catch(err){ toast('Failed: '+err.message,'err'); }
 }
 async function rejectLeaveGroup(groupId){
@@ -2197,12 +2200,14 @@ function computeLeaveGroups(list){
     const ends = g.entries.map(e=> new Date(e.toDate).getTime());
     const statuses = [...new Set(g.entries.map(e=>e.status))];
     const reqTimes = g.entries.map(e=> e.requestedAt?.seconds || 0);
+    const totalDays = g.entries.reduce((sum,e)=> sum + (Number(e.days)||0), 0);
     return {
       ...g,
       minStart: new Date(Math.min(...starts)).toISOString().slice(0,10),
       maxEnd: new Date(Math.max(...ends)).toISOString().slice(0,10),
       status: statuses.length===1 ? statuses[0] : 'Mixed',
-      requestedAtSeconds: Math.max(...reqTimes)
+      requestedAtSeconds: Math.max(...reqTimes),
+      totalDays
     };
   });
 }
@@ -2234,11 +2239,12 @@ function renderLeaveTable(){
   let groups = computeLeaveGroups(list);
   groups.sort((a,b)=> new Date(b.minStart) - new Date(a.minStart) || b.requestedAtSeconds - a.requestedAtSeconds);
 
-  if(groups.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:30px;">No records found</td></tr>'; return; }
+  if(groups.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:30px;">No records found</td></tr>'; return; }
 
   tbody.innerHTML = groups.map(g=>`<tr style="cursor:pointer;" onclick="openLeaveGroupDetail('${g.groupId}')">
       <td>${serialMap[g.groupId]}</td><td>${g.tcNo}</td><td>${g.category||'—'}</td>
       <td>${fmtDate(g.minStart)}</td><td>${fmtDate(g.maxEnd)}</td>
+      <td>${g.totalDays}</td>
       <td>${statusBadge(g.status)}</td>
     </tr>`).join('');
 }
@@ -2299,11 +2305,13 @@ function applyLeaveRequestEditability(){
 // Shows the current status of a submitted request at the top of the Leave Request Form, and
 // — for admins only, while the request is still Pending — the Approve / Reject actions that
 // apply to the complete request as a whole (not to individual leave-type rows within it).
+// Only shown when the request was opened from the Approvals page — not from Leave Details,
+// and never on a brand-new (unsaved) request.
 function updateLrStatusPanel(groupId){
   const panel = document.getElementById('lr_statusPanel');
   const body = document.getElementById('lr_statusPanelBody');
   const isAdmin = currentUser.role==='admin';
-  if(!isAdmin || !groupId){ panel.style.display = 'none'; return; }
+  if(!isAdmin || !groupId || editingGroupOrigin!=='approvals'){ panel.style.display = 'none'; return; }
 
   const entries = leaveList.filter(l => (l.groupId || l.id) === groupId);
   if(entries.length===0){ panel.style.display = 'none'; return; }
@@ -2345,9 +2353,9 @@ function renderLeaveApproved(){
   if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
   list = [...list].sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
 
-  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:30px;">No approved leave records yet</td></tr>'; return; }
-  tbody.innerHTML = list.map(l=>`<tr>
-      <td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
+  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No approved leave records yet</td></tr>'; return; }
+  tbody.innerHTML = list.map((l,i)=>`<tr>
+      <td>${i+1}</td><td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
       <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
       <td>${statusBadge(l.status)}</td>
     </tr>`).join('');
