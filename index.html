@@ -577,12 +577,16 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
         <div id="lr_ticketRow" style="display:none;">
           <div class="field">
             <label>Air Ticket *</label>
-            <select id="lr_ticketType" style="width:100%;">
+            <select id="lr_ticketType" style="width:100%;" onchange="onLrTicketTypeChange()">
               <option value="None">Not using an air ticket for this leave</option>
               <option value="Self Ticket">Self Ticket — I will buy my own ticket</option>
               <option value="Company Ticket">Company Ticket — Company provides the ticket</option>
               <option value="Employee of the Year">Employee of the Year — Complimentary award ticket</option>
             </select>
+          </div>
+          <div class="field" id="lr_ticketPeriodField" style="display:none; margin-top:12px;">
+            <label>Ticket Period (Contract Cycle) *</label>
+            <select id="lr_ticketPeriod" style="width:100%;"></select>
           </div>
           <div class="note-box" style="margin-top:8px;">If a ticket option is chosen, it will be deducted from the staff's air ticket entitlement once this leave is closed on return.</div>
         </div>
@@ -592,8 +596,14 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
           <input type="hidden" id="lr_overallEnd">
           <input type="hidden" id="lr_totalDays">
         </div>
-        <div style="margin-top:6px; padding:16px 18px; background:#F7F3E8; border:1.5px solid var(--border); border-radius:10px; font-family:'Playfair Display',serif; font-size:16px; color:var(--ink); font-weight:600; letter-spacing:.2px; line-height:1.6;">
-          I WISH TO APPLY FOR ( <span id="lr_overallDaysText">0 DAYS</span> ) FROM&nbsp;&nbsp;&nbsp;<span id="lr_overallStartText">—</span>&nbsp;&nbsp;&nbsp;TO :&nbsp;&nbsp;<span id="lr_overallEndText">—</span>&nbsp;&nbsp;AS DETAILED BELOW :
+        <div style="margin-top:6px; padding:18px 20px; background:#F7F3E8; border:1.5px solid var(--border); border-radius:10px; font-family:'Playfair Display',serif; color:var(--ink); line-height:1.8;">
+          <span style="font-size:15px; font-weight:500; color:var(--slate);">I wish to apply for</span>
+          <span style="font-size:20px; font-weight:700; color:var(--gold); margin:0 4px;">( <span id="lr_overallDaysText">0 days</span> )</span>
+          <span style="font-size:15px; font-weight:500; color:var(--slate);">from</span>
+          <span style="font-size:20px; font-weight:700; color:var(--navy); margin:0 6px;" id="lr_overallStartText">—</span>
+          <span style="font-size:15px; font-weight:500; color:var(--slate);">to :</span>
+          <span style="font-size:20px; font-weight:700; color:var(--navy); margin:0 6px;" id="lr_overallEndText">—</span>
+          <span style="font-size:15px; font-weight:500; color:var(--slate);">as detailed below :</span>
         </div>
 
         <div class="warn-box" id="lr_balanceWarning" style="display:none; margin-top:12px;"></div>
@@ -1347,7 +1357,7 @@ function computeTicketPeriods(staff){
   const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
   const usageEvents = leaveList
     .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType && l.ticketType!=='None' && APPROVED_STATUSES.includes(l.status))
-    .map(l=> ({ date: l.fromDate, type: l.ticketType }));
+    .map(l=> ({ date: l.fromDate, type: l.ticketType, periodStart: l.ticketPeriodStart || null }));
   const periods = [];
   let periodStart = new Date(staff.joiningDate);
   let guard = 0;
@@ -1357,13 +1367,20 @@ function computeTicketPeriods(staff){
     // otherwise shift a fixed "365*N days" calculation by a day here and there).
     const periodEnd = new Date(periodStart);
     periodEnd.setFullYear(periodEnd.getFullYear() + cycleYears);
-    const match = usageEvents.find(u=>{ const d = new Date(u.date); return d>=periodStart && d<=periodEnd; });
+    const periodStartIso = periodStart.toISOString().slice(0,10);
+    // Prefer an explicit "this ticket belongs to this cycle" tag (set on the Leave Request
+    // form) over automatic date-range matching — this lets the admin correctly attribute a
+    // ticket usage that was approved late or out of its natural cycle window. Entries saved
+    // before this feature existed have no tag, so they still fall back to date matching.
+    const explicitMatch = usageEvents.find(u=> u.periodStart===periodStartIso);
+    const dateMatch = usageEvents.find(u=> !u.periodStart && (()=>{ const d = new Date(u.date); return d>=periodStart && d<=periodEnd; })());
+    const match = explicitMatch || dateMatch;
     let status;
     if(match) status = 'Used';
     else if(periodEnd < today) status = 'Due';
     else status = 'Not Yet Due';
     periods.push({
-      start: periodStart.toISOString().slice(0,10),
+      start: periodStartIso,
       end: periodEnd.toISOString().slice(0,10),
       status, usedDate: match?match.date:null, ticketType: match?match.type:null
     });
@@ -1729,7 +1746,7 @@ function updateOverallDates(){
   const daysText = document.getElementById('lr_overallDaysText');
   const startText = document.getElementById('lr_overallStartText');
   const endText = document.getElementById('lr_overallEndText');
-  if(daysText) daysText.textContent = totalDays + (totalDays===1 ? ' DAY' : ' DAYS');
+  if(daysText) daysText.textContent = totalDays + (totalDays===1 ? ' day' : ' days');
   if(startText) startText.textContent = minStart ? fmtDDMMYYYY(minStart) : '—';
   if(endText) endText.textContent = maxEnd ? fmtDDMMYYYY(maxEnd) : '—';
 }
@@ -1749,11 +1766,52 @@ function onLrTcNoChange(){
   const s = staffList.find(x=>x.tcNo===tcNo);
   nameInput.value = s ? s.name : '';
   refreshAllRowsCalc();
+  refreshTicketPeriodOptions();
 }
 
 function onLrCategoryChange(){
   const category = document.getElementById('lr_category').value;
   document.getElementById('lr_ticketRow').style.display = category==='Annual Leave' ? 'block' : 'none';
+  refreshTicketPeriodOptions();
+}
+
+function onLrTicketTypeChange(){
+  refreshTicketPeriodOptions();
+}
+
+// Populates the "Ticket Period (Contract Cycle)" dropdown with this staff's air-ticket
+// entitlement cycles (computed from joining date + ticket cycle length), so the admin can
+// explicitly say which cycle a Self/Company/Employee-of-the-Year ticket usage counts against
+// — instead of relying only on automatic date-range matching. Only shown once an actual
+// ticket option (not "None") is selected for an Annual Leave request.
+function refreshTicketPeriodOptions(){
+  const field = document.getElementById('lr_ticketPeriodField');
+  const select = document.getElementById('lr_ticketPeriod');
+  const category = document.getElementById('lr_category').value;
+  const ticketType = document.getElementById('lr_ticketType').value;
+  const tcNo = (document.getElementById('lr_tcNo').value||'').trim();
+  const s = staffList.find(x=>x.tcNo===tcNo);
+
+  if(category!=='Annual Leave' || ticketType==='None' || !s){
+    field.style.display = 'none';
+    select.innerHTML = '';
+    return;
+  }
+
+  const prevValue = select.value;
+  const periods = computeTicketPeriods(s);
+  select.innerHTML = periods.map(p=>
+    `<option value="${p.start}">${fmtDate(p.start)} → ${fmtDate(p.end)} (${p.status})</option>`
+  ).join('');
+
+  if(prevValue && periods.some(p=>p.start===prevValue)){
+    select.value = prevValue;
+  } else {
+    // Default to the first still-open ("Due" or "Not Yet Due") period, otherwise the latest one.
+    const openPeriod = periods.find(p=>p.status!=='Used');
+    select.value = openPeriod ? openPeriod.start : (periods[periods.length-1]?.start || '');
+  }
+  field.style.display = '';
 }
 
 function openLeaveRequestPage(){
@@ -1762,6 +1820,8 @@ function openLeaveRequestPage(){
   document.getElementById('lr_category').value = '';
   document.getElementById('lr_ticketType').value = 'None';
   document.getElementById('lr_ticketRow').style.display = 'none';
+  document.getElementById('lr_ticketPeriodField').style.display = 'none';
+  document.getElementById('lr_ticketPeriod').innerHTML = '';
   const tcInput = document.getElementById('lr_tcNo');
   const nameInput = document.getElementById('lr_staffName');
   if(currentUser && currentUser.role!=='admin'){
@@ -1827,6 +1887,7 @@ async function submitLeaveRequest(){
 
   try{
     const ticketType = (category==='Annual Leave') ? document.getElementById('lr_ticketType').value : 'None';
+    const ticketPeriodStart = (ticketType!=='None') ? (document.getElementById('lr_ticketPeriod').value || null) : null;
     const batch = db.batch();
 
     if(editingGroupId){
@@ -1839,14 +1900,14 @@ async function submitLeaveRequest(){
           batch.update(db.collection('leaves').doc(e.docId), {
             tcNo, name: s.name, category, type: e.type,
             fromDate: e.fromDate, toDate: e.toDate, days: e.days,
-            ticketType, remark: e.remark, year: e.year
+            ticketType, ticketPeriodStart, remark: e.remark, year: e.year
           });
         } else {
           const ref = db.collection('leaves').doc();
           batch.set(ref, {
             tcNo, name: s.name, category, type: e.type,
             fromDate: e.fromDate, toDate: e.toDate, days: e.days,
-            ticketType, groupId: editingGroupId,
+            ticketType, ticketPeriodStart, groupId: editingGroupId,
             status: isAdmin ? 'Reserved' : 'Pending',
             remark: e.remark, year: e.year,
             requestedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1863,7 +1924,7 @@ async function submitLeaveRequest(){
         batch.set(ref, {
           tcNo, name: s.name, category, type: e.type,
           fromDate: e.fromDate, toDate: e.toDate, days: e.days,
-          ticketType, groupId,
+          ticketType, ticketPeriodStart, groupId,
           status: isAdmin ? 'Reserved' : 'Pending',
           remark: e.remark, year: e.year,
           requestedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -2285,6 +2346,10 @@ function openLeaveGroupDetail(groupId, origin){
 
   const ticketEntry = entries.find(e=>e.ticketType && e.ticketType!=='None');
   document.getElementById('lr_ticketType').value = ticketEntry ? ticketEntry.ticketType : 'None';
+  refreshTicketPeriodOptions();
+  if(ticketEntry && ticketEntry.ticketPeriodStart){
+    document.getElementById('lr_ticketPeriod').value = ticketEntry.ticketPeriodStart;
+  }
 
   document.getElementById('matrixRowsContainer').innerHTML = '';
   matrixRowSeq = 0;
@@ -2303,6 +2368,7 @@ function applyLeaveRequestEditability(){
   const readOnly = !!editingGroupId && !isAdmin;
   document.getElementById('lr_category').disabled = readOnly;
   document.getElementById('lr_ticketType').disabled = readOnly;
+  document.getElementById('lr_ticketPeriod').disabled = readOnly;
   document.querySelectorAll('#matrixRowsContainer .mr-type, #matrixRowsContainer .mr-year, #matrixRowsContainer .mr-start, #matrixRowsContainer .mr-days, #matrixRowsContainer .mr-remark').forEach(el=> el.disabled = readOnly);
   document.querySelectorAll('#matrixRowsContainer .matrix-row td:last-child button').forEach(el=> el.style.display = readOnly ? 'none' : '');
   document.getElementById('lr_addMatrixBtn').style.display = readOnly ? 'none' : '';
