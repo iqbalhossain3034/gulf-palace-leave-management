@@ -1316,9 +1316,11 @@ function accruedAnnualLeave(joiningDate, asOf){
   return CFG.fiveYearDays*perDayBefore + (tenureDays - CFG.fiveYearDays)*perDayAfter;
 }
 
-function annualLeaveTakenDays(tcNo, excludeGroupId){
+function annualLeaveTakenDays(tcNo, excludeGroupId, asOfDate){
   return leaveList
-    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && l.status!=='Cancelled' && l.status!=='Rejected' && (!excludeGroupId || (l.groupId||l.id)!==excludeGroupId))
+    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && l.status!=='Cancelled' && l.status!=='Rejected'
+      && (!excludeGroupId || (l.groupId||l.id)!==excludeGroupId)
+      && (!asOfDate || l.fromDate<=asOfDate))
     .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
 }
 
@@ -1596,9 +1598,16 @@ function rowBalanceDisplay(type, asOfDate, year){
   // When viewing/editing an already-submitted request, exclude its own entries from the
   // "taken" count — otherwise the balance would show the request subtracting itself,
   // showing 0 instead of the real balance that was available when it was made.
+  //
+  // Both the accrued entitlement AND the "taken so far" count are scoped to the SAME
+  // as-of date (this row's Start Date). Without this, an old historical entry would show
+  // its entitlement as of that old date, but have it reduced by the staff's ENTIRE
+  // lifetime of Annual Leave taken (including everything taken years afterward) — producing
+  // a huge, misleading negative balance when simply re-opening an old request to view it.
   if(type==='Annual Leave'){
-    const accrued = accruedAnnualLeave(staff.joiningDate, asOfDate || todayISO());
-    const taken = annualLeaveTakenDays(staff.tcNo, editingGroupId);
+    const effectiveAsOf = asOfDate || todayISO();
+    const accrued = accruedAnnualLeave(staff.joiningDate, effectiveAsOf);
+    const taken = annualLeaveTakenDays(staff.tcNo, editingGroupId, effectiveAsOf);
     return (accrued - taken).toFixed(1);
   }
 
