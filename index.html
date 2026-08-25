@@ -1503,7 +1503,7 @@ function renderDashboard(){
         return `<tr>
           <td>${s.tcNo}</td><td>${s.name}</td><td>${s.position}</td><td>${s.jobBand||'—'}</td>
           <td>${s.level||'Staff'}</td><td>Every ${ti.cycleYears}y</td>
-          <td>${fmtDate(current.start)} → ${fmtDate(current.end)}</td>
+          <td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(current.start))} → ${fmtDDMMYYYY(new Date(current.end))}</td>
           <td>${usedCount}</td><td>${remaining}</td>
           <td style="${ti.totalDue>0?'color:var(--danger); font-weight:800;':''}">${ti.totalDue}</td>
         </tr>`;
@@ -2255,7 +2255,7 @@ function openStaffDetail(tcNo){
     <div class="section-title">Air Ticket History</div>
     <div class="tbl-wrap" style="margin-bottom:18px;">
     <table><thead><tr><th>Period</th><th>Status</th><th>Used Date</th><th>Ticket Type</th></tr></thead>
-    <tbody>${ti.periods.map(p=>`<tr><td>${fmtDate(p.start)} → ${fmtDate(p.end)}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
+    <tbody>${ti.periods.map(p=>`<tr><td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(p.start))} → ${fmtDDMMYYYY(new Date(p.end))}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
     </table>
     </div>
 
@@ -2713,7 +2713,7 @@ function renderTicketCards(){
       return `<tr>
         <td>${s.tcNo}</td><td>${s.name}</td><td>${s.position}</td><td>${s.jobBand||'—'}</td>
         <td>${s.level||'Staff'}</td><td>Every ${ti.cycleYears}y</td>
-        <td>${fmtDate(current.start)} → ${fmtDate(current.end)}</td>
+        <td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(current.start))} → ${fmtDDMMYYYY(new Date(current.end))}</td>
         <td>${usedCount}</td>
         <td>${ti.totalDue>0?`<span class="badge badge-danger">${ti.totalDue}</span>`:'<span class="badge badge-success">0</span>'}</td>
         <td><button class="btn btn-outline btn-sm" onclick="openStaffDetail('${s.tcNo}')">History</button></td>
