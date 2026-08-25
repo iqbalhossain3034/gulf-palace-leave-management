@@ -2216,6 +2216,35 @@ function openStaffDetail(tcNo){
       </div>
     </div>
 
+    <div class="section-title" style="margin-bottom:10px;">Leave Summary</div>
+    <div class="grid grid-5" style="margin-bottom:18px;">
+      <div class="card stat-card">
+        <div class="lbl">Leave Taken</div>
+        <div class="val">${b.taken.toFixed(0)}</div>
+        <div class="cap">Annual Leave days used</div>
+      </div>
+      <div class="card stat-card">
+        <div class="lbl">Leave Balance</div>
+        <div class="val" style="${b.balance<10?'color:var(--danger);':''}">${b.balance.toFixed(0)}</div>
+        <div class="cap">Annual Leave days remaining</div>
+      </div>
+      <div class="card stat-card">
+        <div class="lbl">Total Unpaid Leave</div>
+        <div class="val">${fixedLeaveTakenDays(s.tcNo, 'Unpaid Leave', null, null).toFixed(0)}</div>
+        <div class="cap">All-time days</div>
+      </div>
+      <div class="card stat-card">
+        <div class="lbl">Total Sick Leave</div>
+        <div class="val">${fixedLeaveTakenDays(s.tcNo, 'Sick Leave', null, null).toFixed(0)}</div>
+        <div class="cap">All-time days</div>
+      </div>
+      <div class="card stat-card">
+        <div class="lbl">Current Year Sick Leave</div>
+        <div class="val">${fixedLeaveTakenDays(s.tcNo, 'Sick Leave', new Date().getFullYear(), null).toFixed(0)}</div>
+        <div class="cap">${new Date().getFullYear()}'s days</div>
+      </div>
+    </div>
+
     <div class="section-title">Air Ticket History</div>
     <div class="tbl-wrap" style="margin-bottom:18px;">
     <table><thead><tr><th>Period</th><th>Status</th><th>Used Date</th><th>Ticket Type</th></tr></thead>
