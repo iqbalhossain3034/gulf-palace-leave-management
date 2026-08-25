@@ -1454,13 +1454,20 @@ function renderDashboard(){
         const b = leaveBalance(s);
         const pct = Math.max(0, Math.min(100, (b.balance/(b.accrued||1))*100));
         const color = b.balance<10 ? 'var(--danger)' : b.balance<30 ? 'var(--warning)' : 'var(--success)';
+        const thisYear = new Date().getFullYear();
+        const unpaid = fixedLeaveTakenDays(s.tcNo, 'Unpaid Leave', null, null);
+        const sickTotal = fixedLeaveTakenDays(s.tcNo, 'Sick Leave', null, null);
+        const sickYear = fixedLeaveTakenDays(s.tcNo, 'Sick Leave', thisYear, null);
         return `<div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-soft);">
           <div class="ring" style="background:conic-gradient(${color} ${pct*3.6}deg, var(--border-soft) 0deg);"><span>${b.balance.toFixed(0)}</span></div>
           <div style="flex:1;">
             <div class="staff-name" style="font-size:13.5px;">${s.name}</div>
             <div class="staff-role">TC ${s.tcNo} · ${s.position}</div>
           </div>
-          <div style="text-align:right; font-size:12px; color:var(--slate);">Accrued ${b.accrued.toFixed(1)}<br>Taken ${b.taken.toFixed(0)}</div>
+          <div style="text-align:right; font-size:12px; color:var(--slate); line-height:1.6;">
+            <div>Leave Taken ${b.taken.toFixed(0)} &nbsp;·&nbsp; Balance ${b.balance.toFixed(0)}</div>
+            <div>Unpaid ${unpaid.toFixed(0)} &nbsp;·&nbsp; Sick (All) ${sickTotal.toFixed(0)} &nbsp;·&nbsp; Sick (${thisYear}) ${sickYear.toFixed(0)}</div>
+          </div>
         </div>`;
       }catch(err){
         console.error('Dashboard balance render error for', s.tcNo, err);
