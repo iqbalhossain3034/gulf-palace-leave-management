@@ -534,7 +534,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
       <div class="card">
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>TC No</th><th>Name</th><th>Position</th><th>Contract Period</th><th>Balance Leave</th><th>Ticket Due</th><th>Completed</th><th>Status</th></tr></thead>
+          <thead><tr><th>TC No</th><th>Name</th><th>Position</th><th>Contract Period</th><th>Balance Leave</th><th>Ticket Due</th><th>Completed</th><th>Since Last Annual Leave</th><th>Status</th></tr></thead>
           <tbody id="contractsTbody"></tbody>
         </table>
         </div>
@@ -1766,7 +1766,8 @@ function updateBalanceWarningBanner(){
 // right above the table, so the whole request's span is visible at a glance.
 function updateOverallDates(){
   const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
-  let minStart = null, maxEnd = null, totalDays = 0, paidDays = 0, unpaidDays = 0;
+  let minStart = null, maxEnd = null, totalDays = 0;
+  const rowsData = [];
   rows.forEach(row=>{
     const start = row.querySelector('.mr-start').value;
     const endIso = row.querySelector('.mr-end').dataset.iso;
@@ -1775,7 +1776,7 @@ function updateOverallDates(){
     if(start){ const d = new Date(start); if(!minStart || d<minStart) minStart = d; }
     if(endIso){ const d = new Date(endIso); if(!maxEnd || d>maxEnd) maxEnd = d; }
     totalDays += days;
-    if(type==='Unpaid Leave') unpaidDays += days; else paidDays += days;
+    rowsData.push({ start, days, type });
   });
   const startBox = document.getElementById('lr_overallStart');
   const endBox = document.getElementById('lr_overallEnd');
@@ -1791,15 +1792,25 @@ function updateOverallDates(){
   if(startText) startText.textContent = minStart ? fmtDDMMYYYY(minStart) : '—';
   if(endText) endText.textContent = maxEnd ? fmtDDMMYYYY(maxEnd) : '—';
 
-  updateLrPayPanel(paidDays, unpaidDays);
+  updateLrPayPanel(rowsData);
 }
 
-// Admin-only cross-check: how much this leave request is worth in SAR, based on the staff's
-// monthly package (Basic + Food + House ÷ 30 days). Unpaid Leave days are excluded from the
-// payable amount since they carry no pay by definition. This panel is deliberately never
+// Number of actual calendar days in a given month (28/29/30/31) — used so a day of leave in
+// February is worth monthly-package÷28 (or ÷29 in a leap year) while a day in a 31-day month
+// like July or August is worth monthly-package÷31, matching how Accounts actually calculates
+// it, rather than assuming every month has a flat 30 days.
+function daysInCalendarMonth(year, monthIndexZeroBased){
+  return new Date(year, monthIndexZeroBased+1, 0).getDate();
+}
+
+// Admin-only cross-check: how much this leave request is worth in SAR. Each individual day
+// of paid leave is valued at (monthly package ÷ actual number of days in THAT calendar
+// month) — not a flat 30-day assumption — so a request spanning a 31-day month and a 28-day
+// month is valued correctly for each day rather than uniformly. Unpaid Leave days are
+// excluded entirely since they carry no pay by definition. This panel is deliberately never
 // included in the printed leave form — it's for internal verification against what Accounts
 // actually pays out, not something the staff member needs to see.
-function updateLrPayPanel(paidDays, unpaidDays){
+function updateLrPayPanel(rowsData){
   const panel = document.getElementById('lr_payPanel');
   const body = document.getElementById('lr_payPanelBody');
   if(!panel || !body) return;
@@ -1807,17 +1818,28 @@ function updateLrPayPanel(paidDays, unpaidDays){
 
   const tcNo = (document.getElementById('lr_tcNo').value||'').trim();
   const s = staffList.find(x=>x.tcNo===tcNo);
-  if(!s || (paidDays+unpaidDays)<=0){ panel.style.display = 'none'; return; }
+  const totalMonthly = s ? (Number(s.salary)||0) + (Number(s.food)||0) + (Number(s.house)||0) : 0;
 
-  const totalMonthly = (Number(s.salary)||0) + (Number(s.food)||0) + (Number(s.house)||0);
-  const dailyRate = totalMonthly/30;
-  const payAmount = paidDays * dailyRate;
+  let paidDays = 0, unpaidDays = 0, payAmount = 0;
+  rowsData.forEach(r=>{
+    if(!r.start || !r.days || r.days<=0) return;
+    for(let i=0;i<r.days;i++){
+      const d = new Date(r.start);
+      d.setDate(d.getDate()+i);
+      if(r.type==='Unpaid Leave'){ unpaidDays++; continue; }
+      paidDays++;
+      const dim = daysInCalendarMonth(d.getFullYear(), d.getMonth());
+      payAmount += totalMonthly/dim;
+    }
+  });
+
+  if(!s || (paidDays+unpaidDays)<=0){ panel.style.display = 'none'; return; }
 
   body.innerHTML = `
     <div class="k-v"><span>Monthly Package (Basic+Food+House)</span><span>${totalMonthly.toFixed(2)} SAR</span></div>
-    <div class="k-v"><span>Daily Rate (÷ 30)</span><span>${dailyRate.toFixed(2)} SAR</span></div>
     <div class="k-v"><span>Paid Leave Days</span><span>${paidDays}</span></div>
     ${unpaidDays>0 ? `<div class="k-v"><span>Unpaid Leave Days (excluded)</span><span>${unpaidDays}</span></div>` : ''}
+    <div class="k-v" style="font-size:11.5px; color:var(--slate);"><span>Rate basis</span><span>Monthly package ÷ actual days in each calendar month (28–31)</span></div>
     <div class="k-v" style="font-weight:800; font-size:16px; border-bottom:none; border-top:1.5px solid var(--border); margin-top:6px; padding-top:10px; color:var(--navy);"><span>Estimated Amount Payable</span><span>${payAmount.toFixed(2)} SAR</span></div>
   `;
   panel.style.display = '';
@@ -2331,9 +2353,27 @@ function openStaffDetail(tcNo){
 /* =========================================================================
    CONTRACTS VIEW
    ========================================================================= */
+// Finds the most recently COMPLETED Annual Leave for a staff member (its End Date has
+// already passed, i.e. they've returned to work) and reports that return date, so the
+// admin can check elapsed time against the company's minimum gap policy before the next
+// Annual Leave request (informally ~21 months minimum, company generally wants a full 2
+// years/24 months before allowing the next one).
+function lastAnnualLeaveReturn(tcNo){
+  const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
+  const today = todayISO();
+  const completed = leaveList
+    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && APPROVED_STATUSES.includes(l.status) && l.toDate < today)
+    .sort((a,b)=> new Date(b.toDate) - new Date(a.toDate));
+  if(completed.length===0) return null;
+  const last = completed[0];
+  const returnDate = new Date(last.toDate);
+  returnDate.setDate(returnDate.getDate()+1); // the day after the leave's last day is the return-to-work day
+  return { returnDateIso: returnDate.toISOString().slice(0,10), leaveToDate: last.toDate };
+}
+
 function renderContracts(){
   const tbody = document.getElementById('contractsTbody');
-  if(staffList.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No staff</td></tr>'; return; }
+  if(staffList.length===0){ tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--slate); padding:30px;">No staff</td></tr>'; return; }
   tbody.innerHTML = staffList.map(s=>{
     const b = leaveBalance(s);
     const ti = ticketInfo(s);
@@ -2344,12 +2384,27 @@ function renderContracts(){
     else if(dl!==null && dl<0) statusHtml = '<span class="badge badge-danger">Expired</span>';
     else if(dl!==null && dl<=60) statusHtml = '<span class="badge badge-warning">Expiring Soon</span>';
     else statusHtml = '<span class="badge badge-success">Active</span>';
+
+    const lastReturn = lastAnnualLeaveReturn(s.tcNo);
+    let sinceReturnHtml;
+    if(!lastReturn){
+      sinceReturnHtml = '<span style="color:var(--slate); font-size:12px;">No completed Annual Leave yet</span>';
+    } else {
+      const since = tenureYearsMonthsDays(lastReturn.returnDateIso);
+      const totalMonthsSince = since.y*12 + since.m;
+      const eligibleBadge = totalMonthsSince>=21
+        ? '<span class="badge badge-success">Eligible</span>'
+        : '<span class="badge badge-warning">Not Yet (min 21m)</span>';
+      sinceReturnHtml = `<div style="white-space:nowrap;">${since.y}y ${since.m}m ${since.d}d</div><div style="margin-top:3px;">${eligibleBadge}</div><div style="font-size:11px; color:var(--slate); margin-top:2px; white-space:nowrap;">Returned ${fmtDDMMYYYY(new Date(lastReturn.returnDateIso))}</div>`;
+    }
+
     return `<tr>
       <td>${s.tcNo}</td><td>${s.name}</td><td>${s.position}</td>
-      <td>${fmtDate(s.contractStart)} → ${fmtDate(s.contractEnd)}</td>
+      <td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(s.contractStart))} → ${fmtDDMMYYYY(new Date(s.contractEnd))}</td>
       <td>${b.balance.toFixed(1)}</td>
       <td>${ti.due?'<span class="badge badge-danger">Due</span>':fmtDate(ti.nextDue)}</td>
       <td>${tenure.y}y ${tenure.m}m ${tenure.d}d</td>
+      <td>${sinceReturnHtml}</td>
       <td>${statusHtml}</td>
     </tr>`;
   }).join('');
