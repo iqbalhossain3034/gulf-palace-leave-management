@@ -280,11 +280,11 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
     <div id="loginError" class="login-error"></div>
     <div class="field">
       <label>Username</label>
-      <input type="text" id="loginTc" placeholder="Username" autocomplete="username" inputmode="numeric">
+      <input type="text" id="loginTc" placeholder="Username" autocomplete="off" inputmode="numeric">
     </div>
     <div class="field">
       <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="off">
     </div>
     <button class="btn btn-gold btn-block" onclick="doLogin()">Sign In</button>
   </div>
@@ -545,6 +545,12 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
     <section id="view-leaveRequest" class="view" style="display:none;">
       <div class="topbar">
         <div><h2 id="lr_pageTitle">Leave Request</h2><div class="sub" id="lr_pageSub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
+        <div id="lr_serialBadge" style="display:none; align-self:flex-start;">
+          <div style="background:var(--navy); color:#fff; border-radius:10px; padding:8px 18px; text-align:center; font-family:'Playfair Display',serif;">
+            <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--gold-light); font-weight:700;">Leave Request S/N</div>
+            <div style="font-size:22px; font-weight:800; line-height:1.2;" id="lr_serialBadgeVal">—</div>
+          </div>
+        </div>
       </div>
 
       <div class="card card-pad admin-only" id="lr_statusPanel" style="display:none; margin-bottom:16px;">
@@ -625,6 +631,11 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
         </div>
 
         <button type="button" class="btn btn-outline" id="lr_addMatrixBtn" style="margin-top:14px;" onclick="addMatrixRow()">+ Add Matrix</button>
+
+        <div class="card card-pad admin-only" id="lr_payPanel" style="display:none; margin-top:18px; background:#F7F3E8; border:1.5px solid var(--border);">
+          <div class="section-title" style="margin-bottom:2px;">Estimated Leave Pay <span style="font-weight:400; font-size:12px; color:var(--slate);">— admin view only, for cross-checking with Accounts; never printed</span></div>
+          <div id="lr_payPanelBody" style="margin-top:10px;"></div>
+        </div>
 
         <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn btn-gold" id="lr_saveBtn" onclick="submitLeaveRequest()">Save</button>
@@ -1114,6 +1125,12 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('app').style.display='none';
     document.getElementById('loginScreen').style.display='flex';
     currentUser = null;
+    // Security: never leave a previous user's username/password sitting in the login
+    // fields (or visible to browser autofill) once someone is signed out.
+    const tcBox = document.getElementById('loginTc');
+    const passBox = document.getElementById('loginPassword');
+    if(tcBox) tcBox.value = '';
+    if(passBox) passBox.value = '';
   }
 });
 
@@ -1134,7 +1151,13 @@ function doLogin(){
     errBox.style.display='block';
   });
 }
-function doLogout(){ auth.signOut(); }
+function doLogout(){
+  const tcBox = document.getElementById('loginTc');
+  const passBox = document.getElementById('loginPassword');
+  if(tcBox) tcBox.value = '';
+  if(passBox) passBox.value = '';
+  auth.signOut();
+}
 document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 
 /* Resolve the logged-in user's staff record + role, and lock down the UI accordingly. */
@@ -1743,14 +1766,16 @@ function updateBalanceWarningBanner(){
 // right above the table, so the whole request's span is visible at a glance.
 function updateOverallDates(){
   const rows = document.querySelectorAll('#matrixRowsContainer .matrix-row');
-  let minStart = null, maxEnd = null, totalDays = 0;
+  let minStart = null, maxEnd = null, totalDays = 0, paidDays = 0, unpaidDays = 0;
   rows.forEach(row=>{
     const start = row.querySelector('.mr-start').value;
     const endIso = row.querySelector('.mr-end').dataset.iso;
     const days = Number(row.querySelector('.mr-days').value) || 0;
+    const type = row.querySelector('.mr-type').value;
     if(start){ const d = new Date(start); if(!minStart || d<minStart) minStart = d; }
     if(endIso){ const d = new Date(endIso); if(!maxEnd || d>maxEnd) maxEnd = d; }
     totalDays += days;
+    if(type==='Unpaid Leave') unpaidDays += days; else paidDays += days;
   });
   const startBox = document.getElementById('lr_overallStart');
   const endBox = document.getElementById('lr_overallEnd');
@@ -1765,6 +1790,37 @@ function updateOverallDates(){
   if(daysText) daysText.textContent = totalDays + (totalDays===1 ? ' day' : ' days');
   if(startText) startText.textContent = minStart ? fmtDDMMYYYY(minStart) : '—';
   if(endText) endText.textContent = maxEnd ? fmtDDMMYYYY(maxEnd) : '—';
+
+  updateLrPayPanel(paidDays, unpaidDays);
+}
+
+// Admin-only cross-check: how much this leave request is worth in SAR, based on the staff's
+// monthly package (Basic + Food + House ÷ 30 days). Unpaid Leave days are excluded from the
+// payable amount since they carry no pay by definition. This panel is deliberately never
+// included in the printed leave form — it's for internal verification against what Accounts
+// actually pays out, not something the staff member needs to see.
+function updateLrPayPanel(paidDays, unpaidDays){
+  const panel = document.getElementById('lr_payPanel');
+  const body = document.getElementById('lr_payPanelBody');
+  if(!panel || !body) return;
+  if(!currentUser || currentUser.role!=='admin'){ panel.style.display = 'none'; return; }
+
+  const tcNo = (document.getElementById('lr_tcNo').value||'').trim();
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  if(!s || (paidDays+unpaidDays)<=0){ panel.style.display = 'none'; return; }
+
+  const totalMonthly = (Number(s.salary)||0) + (Number(s.food)||0) + (Number(s.house)||0);
+  const dailyRate = totalMonthly/30;
+  const payAmount = paidDays * dailyRate;
+
+  body.innerHTML = `
+    <div class="k-v"><span>Monthly Package (Basic+Food+House)</span><span>${totalMonthly.toFixed(2)} SAR</span></div>
+    <div class="k-v"><span>Daily Rate (÷ 30)</span><span>${dailyRate.toFixed(2)} SAR</span></div>
+    <div class="k-v"><span>Paid Leave Days</span><span>${paidDays}</span></div>
+    ${unpaidDays>0 ? `<div class="k-v"><span>Unpaid Leave Days (excluded)</span><span>${unpaidDays}</span></div>` : ''}
+    <div class="k-v" style="font-weight:800; font-size:16px; border-bottom:none; border-top:1.5px solid var(--border); margin-top:6px; padding-top:10px; color:var(--navy);"><span>Estimated Amount Payable</span><span>${payAmount.toFixed(2)} SAR</span></div>
+  `;
+  panel.style.display = '';
 }
 function fmtDDMMYYYY(dateObj){
   const iso = dateObj.toISOString().slice(0,10);
@@ -1833,6 +1889,7 @@ function refreshTicketPeriodOptions(){
 function openLeaveRequestPage(){
   editingGroupId = null;
   editingGroupOrigin = 'leaveDetails';
+  document.getElementById('lr_serialBadge').style.display = 'none';
   document.getElementById('lr_category').value = '';
   document.getElementById('lr_ticketType').value = 'None';
   document.getElementById('lr_ticketRow').style.display = 'none';
@@ -2380,6 +2437,19 @@ function openLeaveGroupDetail(groupId, origin){
   editingGroupOrigin = origin || 'leaveDetails';
 
   showView('leaveRequest');
+
+  // Show the same permanent S/N used everywhere else (Leave Details, Approvals, Leave
+  // Approved) at the top of the form, so it's always clear which request this is.
+  const serialMap = computeGroupSerialMap();
+  const badge = document.getElementById('lr_serialBadge');
+  const badgeVal = document.getElementById('lr_serialBadgeVal');
+  if(serialMap[groupId]){
+    badgeVal.textContent = '#' + serialMap[groupId];
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+
   document.getElementById('lr_category').value = first.category || '';
   onLrCategoryChange();
 
