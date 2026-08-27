@@ -1435,28 +1435,20 @@ function computeTicketPeriods(staff){
   return periods;
 }
 
-// Each "Employee of the Year" award grants one extra bonus air ticket, on top of the
-// normal cycle-based entitlement. A bonus is considered "used" once a ticketLog entry
-// exists tagged as an Employee of the Year bonus.
-function employeeOfYearAwardsCount(tcNo){
-  return leaveList.filter(l=> l.tcNo===tcNo && l.type==='Employee of the Year' && l.status!=='Cancelled' && l.status!=='Rejected').length;
-}
-function employeeOfYearBonusUsedCount(staff){
-  return (staff.ticketLog||[]).filter(u=>u.type==='Employee of the Year Bonus').length;
-}
+// NOTE: "Employee of the Year" ticket usage is now tracked the same way as Self/Company
+// tickets — via ticketType on an Annual Leave request, matched against a contract-cycle
+// period in computeTicketPeriods() above. There is deliberately no separate bonus-ticket
+// mechanism anymore; the cycle periods above are the single source of truth for what's due.
 
 function ticketInfo(staff){
   const periods = computeTicketPeriods(staff);
   const cycleDue = periods.filter(p=>p.status==='Due').length;
-  const bonusAwarded = employeeOfYearAwardsCount(staff.tcNo);
-  const bonusUsed = employeeOfYearBonusUsedCount(staff);
-  const bonusOutstanding = Math.max(0, bonusAwarded - bonusUsed);
-  const totalDue = cycleDue + bonusOutstanding;
+  const totalDue = cycleDue;
   const current = periods[periods.length-1];
   const daysLeft = current ? daysBetween(todayISO(), current.end) : 0;
   return {
     cycleYears: ticketCycleYearsForStaff(staff),
-    periods, cycleDue, bonusAwarded, bonusUsed, bonusOutstanding, totalDue,
+    periods, cycleDue, totalDue,
     base: current ? current.start : staff.joiningDate,
     nextDue: current ? current.end : staff.joiningDate,
     daysLeft, due: totalDue>0
@@ -2399,7 +2391,6 @@ function openStaffDetail(tcNo){
         <div class="k-v"><span>Taken</span><span>${b.taken.toFixed(0)} days</span></div>
         <div class="k-v"><span>Balance</span><span style="color:${b.balance<10?'var(--danger)':'var(--success)'}; font-weight:800;">${b.balance.toFixed(2)} days</span></div>
         <div class="k-v"><span>Ticket Cycle</span><span>Every ${ti.cycleYears} year(s)</span></div>
-        <div class="k-v"><span>Employee of the Year Bonus</span><span>${ti.bonusOutstanding>0?`<b style="color:var(--warning);">${ti.bonusOutstanding} outstanding</b>`:(ti.bonusAwarded>0?`${ti.bonusAwarded} awarded, all used`:'—')}</span></div>
         <div class="k-v"><span>Total Tickets Due</span><span style="${ti.totalDue>0?'color:var(--danger); font-weight:800;':''}">${ti.totalDue}</span></div>
         <div class="k-v"><span>Salary (Basic+Food+House)</span><span>${(s.salary+s.food+s.house).toFixed(0)} SAR</span></div>
       </div>
@@ -2435,15 +2426,12 @@ function openStaffDetail(tcNo){
     </div>
 
     <div class="section-title">Air Ticket History</div>
-    <div class="k-v"><span>Ticket Cycle Due (from ${ti.cycleYears}-year periods above)</span><span>${ti.cycleDue}</span></div>
-    ${ti.bonusAwarded>0 ? `<div class="k-v"><span>"Employee of the Year" Award Tickets (earned ${ti.bonusAwarded}, used ${ti.bonusUsed})</span><span>${ti.bonusOutstanding} outstanding</span></div>` : ''}
-    <div class="k-v" style="font-weight:800;"><span>Total Tickets Due</span><span>${ti.totalDue}</span></div>
+    <div class="k-v" style="font-weight:800;"><span>Total Tickets Due (from ${ti.cycleYears}-year contract periods below)</span><span>${ti.totalDue}</span></div>
     <div class="tbl-wrap" style="margin:10px 0 18px;">
     <table><thead><tr><th>Period</th><th>Status</th><th>Used Date</th><th>Ticket Type</th></tr></thead>
     <tbody>${ti.periods.map(p=>`<tr><td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(p.start))} → ${fmtDDMMYYYY(new Date(p.end))}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
     </table>
     </div>
-    ${ti.bonusAwarded>0 ? `<div class="note-box" style="margin-bottom:18px;">This table only lists the regular ${ti.cycleYears}-year cycle periods. This staff member also has ${ti.bonusAwarded} separate "Employee of the Year" award-ticket entitlement(s) (a different, one-off bonus — not part of the cycle above), of which ${ti.bonusOutstanding} is/are still outstanding. That's why "Total Tickets Due" above can be higher than the number of "Due" rows in this table.</div>` : ''}
 
     <div class="section-title">Leave History (${hist.length})</div>
     <div class="note-box" style="margin-bottom:10px;">A ticket only counts as "Used" in Air Ticket History above when a record here is <b>Annual Leave</b>, Status = <b>Closed</b>, and Ticket is not "None".</div>
