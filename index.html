@@ -48,6 +48,7 @@ body{
   background:var(--cream);
   color:var(--ink);
   -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
 }
 .bn{font-family:'Noto Sans Bengali','Inter',sans-serif;}
 .ar{font-family:'Noto Naskh Arabic',sans-serif; direction:rtl;}
@@ -547,11 +548,11 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
     <!-- ================= LEAVE RECORDS ================= -->
     <section id="view-leaveRequest" class="view" style="display:none;">
       <div class="topbar">
-        <div><h2 id="lr_pageTitle">Leave Request</h2><div class="sub" id="lr_pageSub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
-        <div id="lr_serialBadge" style="display:none; align-self:flex-start;">
-          <div style="background:var(--navy); color:#fff; border-radius:10px; padding:8px 18px; text-align:center; font-family:'Playfair Display',serif;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--gold-light); font-weight:700;">Leave Request S/N</div>
-            <div style="font-size:22px; font-weight:800; line-height:1.2;" id="lr_serialBadgeVal">—</div>
+        <div style="min-width:0; flex:1 1 auto;"><h2 id="lr_pageTitle">Leave Request</h2><div class="sub" id="lr_pageSub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
+        <div id="lr_serialBadge" style="display:none; flex-shrink:0;">
+          <div style="background:var(--navy); color:#fff; border-radius:10px; padding:6px 14px; text-align:center; font-family:'Playfair Display',serif; white-space:nowrap;">
+            <div style="font-size:9px; text-transform:uppercase; letter-spacing:0.5px; color:var(--gold-light); font-weight:700;">S/N</div>
+            <div style="font-size:19px; font-weight:800; line-height:1.2;" id="lr_serialBadgeVal">—</div>
           </div>
         </div>
       </div>
@@ -1336,7 +1337,16 @@ function toast(msg, type){
    ========================================================================= */
 function daysBetween(a,b){ return Math.round((new Date(b) - new Date(a)) / MS_DAY); }
 function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
-function todayISO(){ return new Date().toISOString().slice(0,10); }
+// Local calendar date (not UTC) — toISOString() alone can be off by a day for users in
+// timezones ahead of UTC (e.g. Saudi Arabia, UTC+3) during the first few hours of the day,
+// which would make leave status calculations (Reserved/On Leave/Returned) flip a day early.
+function todayISO(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 
 // Accrued annual leave since joining, per Saudi labour law style tiered rate
 function accruedAnnualLeave(joiningDate, asOf){
@@ -1453,8 +1463,12 @@ function ticketInfo(staff){
   };
 }
 
+// Returns the leave record that has this staff currently, actually on leave TODAY — i.e.
+// approved (Reserved/On Leave) AND today falls within its date range. A future-dated
+// approved leave or one that has already ended does not count as "currently" on leave.
 function activeLeaveFor(tcNo){
-  return leaveList.find(l=> l.tcNo===tcNo && (l.status==='On Leave' || l.status==='Reserved'));
+  const today = todayISO();
+  return leaveList.find(l=> l.tcNo===tcNo && (l.status==='On Leave' || l.status==='Reserved') && l.fromDate<=today && l.toDate>=today);
 }
 
 /* =========================================================================
@@ -1465,7 +1479,7 @@ function renderDashboard(){
   const active = staffList.filter(s=>s.status!=='Resigned');
   document.getElementById('statTotalStaff').textContent = staffList.length;
   document.getElementById('statActiveStaff').textContent = active.length + ' active';
-  document.getElementById('statOnLeave').textContent = leaveList.filter(l=>l.status==='On Leave').length;
+  document.getElementById('statOnLeave').textContent = leaveList.filter(l=> effectiveLeaveStatus(l)==='On Leave').length;
 
   const ticketDue = staffList.filter(s=>s.status!=='Resigned' && ticketInfo(s).due).length;
   document.getElementById('statTicketDue').textContent = ticketDue;
@@ -1518,7 +1532,7 @@ function renderDashboard(){
     actBox.innerHTML = recent.map(l=>`
       <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border-soft); font-size:13px;">
         <div><b>${l.name}</b><span style="color:var(--slate);"> · ${l.type}</span></div>
-        <div>${statusBadge(l.status)}</div>
+        <div>${statusBadge(effectiveLeaveStatus(l))}</div>
       </div>`).join('');
   }
 
@@ -1545,8 +1559,21 @@ function renderDashboard(){
   }
 }
 
+// Pending/Cancelled/Rejected/Closed are explicit states set by an admin action — never
+// recomputed. But 'Reserved' (approved) and 'On Leave' are automatically reinterpreted
+// against today's date so a leave that has finished shows as "Returned" and one currently
+// in progress shows as "On Leave", without needing the admin to manually flip a status for
+// every single record (which is impractical for bulk-entered historical leave).
+function effectiveLeaveStatus(l){
+  if(l.status==='Pending' || l.status==='Cancelled' || l.status==='Rejected' || l.status==='Closed') return l.status;
+  const today = todayISO();
+  if(today < l.fromDate) return 'Reserved';
+  if(today <= l.toDate) return 'On Leave';
+  return 'Returned';
+}
+
 function statusBadge(status){
-  const map = { 'Pending':'badge-warning', 'Reserved':'badge-info', 'On Leave':'badge-warning', 'Closed':'badge-success', 'Cancelled':'badge-neutral', 'Rejected':'badge-danger' };
+  const map = { 'Pending':'badge-warning', 'Reserved':'badge-info', 'On Leave':'badge-warning', 'Returned':'badge-success', 'Closed':'badge-success', 'Cancelled':'badge-neutral', 'Rejected':'badge-danger' };
   return `<span class="badge ${map[status]||'badge-neutral'}">${status}</span>`;
 }
 
@@ -1585,7 +1612,7 @@ function renderMyLeaveHome(){
 
   const hist = leaveList.filter(l=>l.tcNo===currentUser.tcNo).sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
   const tbody = document.getElementById('myLeaveTbody');
-  tbody.innerHTML = hist.length ? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td></tr>`).join('')
+  tbody.innerHTML = hist.length ? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(effectiveLeaveStatus(l))}</td></tr>`).join('')
     : '<tr><td colspan="5" style="text-align:center; color:var(--slate); padding:24px;">No leave records yet</td></tr>';
 }
 
@@ -2191,7 +2218,7 @@ function renderStaffGrid(){
           <div class="staff-name">${s.name}</div>
           <div class="staff-role">${s.position}${s.jobBand?' · '+s.jobBand:''} · TC ${s.tcNo}</div>
         </div>
-        ${statusBadge(activeLv? activeLv.status : (s.status==='Resigned'?'Cancelled':'Closed')).replace(activeLv?activeLv.status:(s.status==='Resigned'?'Cancelled':'Closed'), s.status)}
+        ${activeLv ? '<span class="badge badge-warning">On Leave</span>' : statusBadge(s.status==='Resigned'?'Cancelled':'Closed').replace(s.status==='Resigned'?'Cancelled':'Closed', s.status)}
       </div>
       <div class="staff-meta">
         <div>Balance <b>${b.balance.toFixed(1)}</b> days</div>
@@ -2418,7 +2445,7 @@ function openStaffDetail(tcNo){
     <div class="note-box" style="margin-bottom:10px;">A ticket only counts as "Used" in Air Ticket History above when a record here is <b>Annual Leave</b>, Status = <b>Closed</b>, and Ticket is not "None".</div>
     <div class="tbl-wrap" style="max-height:260px; overflow-y:auto;">
     <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Ticket</th></tr></thead>
-    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td><td>${(l.ticketType&&l.ticketType!=='None')?`<span class="badge badge-info">${l.ticketType}</span>`:'—'}</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center; color:var(--slate);">No records</td></tr>'}</tbody>
+    <tbody>${hist.length? hist.map(l=>`<tr><td>${l.type}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${statusBadge(effectiveLeaveStatus(l))}</td><td>${(l.ticketType&&l.ticketType!=='None')?`<span class="badge badge-info">${l.ticketType}</span>`:'—'}</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center; color:var(--slate);">No records</td></tr>'}</tbody>
     </table>
     </div>
   `;
@@ -2501,7 +2528,7 @@ function computeLeaveGroups(list){
   return Object.values(map).map(g=>{
     const starts = g.entries.map(e=> new Date(e.fromDate).getTime());
     const ends = g.entries.map(e=> new Date(e.toDate).getTime());
-    const statuses = [...new Set(g.entries.map(e=>e.status))];
+    const statuses = [...new Set(g.entries.map(e=>effectiveLeaveStatus(e)))];
     const reqTimes = g.entries.map(e=> e.requestedAt?.seconds || 0);
     const totalDays = g.entries.reduce((sum,e)=> sum + (Number(e.days)||0), 0);
     return {
@@ -2713,7 +2740,7 @@ function renderLeaveApproved(){
   tbody.innerHTML = list.map(l=>`<tr>
       <td>${serialMap[l.groupId||l.id]}</td><td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
       <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
-      <td>${statusBadge(l.status)}</td>
+      <td>${statusBadge(effectiveLeaveStatus(l))}</td>
     </tr>`).join('');
 }
 
