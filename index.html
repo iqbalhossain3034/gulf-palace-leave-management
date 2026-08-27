@@ -676,6 +676,12 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
       <div class="topbar">
         <div><h2>Leave Approved</h2><div class="sub">Approved leave records</div><div class="divider-motif"></div></div>
       </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="leaveApprovedSearch" oninput="renderLeaveApproved()" placeholder="Search by name, TC No, S/N, date, category or leave type...">
+        </div>
+      </div>
       <div class="card">
         <div class="tbl-wrap">
         <table>
@@ -2664,19 +2670,46 @@ async function deleteEntireGroupFromForm(){
 // complete request carries in Leave Details / Approvals — so entries from one combined
 // request (e.g. Annual + Unpaid + Eid Al Adha submitted together) all share that one S/N,
 // letting the admin see at a glance which leave request each row belongs to.
+// Shows one row per individual approved leave-type entry (so admin can see exactly which
+// leave types make up a request), but labels each row with the SAME permanent S/N that the
+// complete request carries in Leave Details / Approvals — so entries from one combined
+// request (e.g. Annual + Unpaid + Eid Al Adha submitted together) all share that one S/N,
+// letting the admin see at a glance which leave request each row belongs to.
+//
+// Supports free-text search across name, TC No, S/N, start/end date, category, and leave
+// type — matching whatever criteria the admin types, so any one of them is enough to find a
+// specific staff member's approved leave history, a specific request by its S/N, or every
+// leave that touches a given date.
 function renderLeaveApproved(){
   if(!currentUser) return;
   const tbody = document.getElementById('leaveApprovedTbody');
   if(!tbody) return;
   const approvedStatuses = ['Reserved','On Leave','Closed'];
+  const q = (document.getElementById('leaveApprovedSearch')?.value||'').trim().toLowerCase().replace(/^#/,'');
 
   const serialMap = computeGroupSerialMap();
 
   let list = leaveList.filter(l=>approvedStatuses.includes(l.status));
   if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
+
+  if(q){
+    list = list.filter(l=>{
+      const sn = String(serialMap[l.groupId||l.id] || '');
+      return (l.name||'').toLowerCase().includes(q)
+        || (l.tcNo||'').toLowerCase().includes(q)
+        || sn === q
+        || (l.category||'').toLowerCase().includes(q)
+        || (l.type||'').toLowerCase().includes(q)
+        || fmtDate(l.fromDate).toLowerCase().includes(q)
+        || fmtDate(l.toDate).toLowerCase().includes(q)
+        || (l.fromDate||'').includes(q)
+        || (l.toDate||'').includes(q);
+    });
+  }
+
   list = [...list].sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
 
-  if(list.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">No approved leave records yet</td></tr>'; return; }
+  if(list.length===0){ tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:30px;">${q ? 'No matching approved leave records' : 'No approved leave records yet'}</td></tr>`; return; }
   tbody.innerHTML = list.map(l=>`<tr>
       <td>${serialMap[l.groupId||l.id]}</td><td>${l.name}</td><td>${l.category||'—'}</td><td>${l.type}</td>
       <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td>
