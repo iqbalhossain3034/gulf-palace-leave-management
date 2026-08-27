@@ -547,12 +547,12 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
 
     <!-- ================= LEAVE RECORDS ================= -->
     <section id="view-leaveRequest" class="view" style="display:none;">
-      <div class="topbar">
+      <div class="topbar" style="position:relative; padding-right:70px;">
         <div style="min-width:0; flex:1 1 auto;"><h2 id="lr_pageTitle">Leave Request</h2><div class="sub" id="lr_pageSub">Create and submit a new leave request</div><div class="divider-motif"></div></div>
-        <div id="lr_serialBadge" style="display:none; flex-shrink:0;">
-          <div style="background:var(--navy); color:#fff; border-radius:10px; padding:6px 14px; text-align:center; font-family:'Playfair Display',serif; white-space:nowrap;">
+        <div id="lr_serialBadge" style="display:none; position:absolute; top:0; right:0;">
+          <div style="background:var(--navy); color:#fff; border-radius:10px; padding:6px 12px; text-align:center; font-family:'Playfair Display',serif; white-space:nowrap;">
             <div style="font-size:9px; text-transform:uppercase; letter-spacing:0.5px; color:var(--gold-light); font-weight:700;">S/N</div>
-            <div style="font-size:19px; font-weight:800; line-height:1.2;" id="lr_serialBadgeVal">—</div>
+            <div style="font-size:18px; font-weight:800; line-height:1.2;" id="lr_serialBadgeVal">—</div>
           </div>
         </div>
       </div>
@@ -659,7 +659,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
       <div class="toolbar">
         <div class="search-box">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="Search by name or TC No...">
+          <input id="leaveSearch" oninput="renderLeaveTable()" placeholder="Search by S/N, TC No, name, category or date...">
         </div>
       </div>
       <div class="card">
@@ -2435,11 +2435,15 @@ function openStaffDetail(tcNo){
     </div>
 
     <div class="section-title">Air Ticket History</div>
-    <div class="tbl-wrap" style="margin-bottom:18px;">
+    <div class="k-v"><span>Ticket Cycle Due (from ${ti.cycleYears}-year periods above)</span><span>${ti.cycleDue}</span></div>
+    ${ti.bonusAwarded>0 ? `<div class="k-v"><span>"Employee of the Year" Award Tickets (earned ${ti.bonusAwarded}, used ${ti.bonusUsed})</span><span>${ti.bonusOutstanding} outstanding</span></div>` : ''}
+    <div class="k-v" style="font-weight:800;"><span>Total Tickets Due</span><span>${ti.totalDue}</span></div>
+    <div class="tbl-wrap" style="margin:10px 0 18px;">
     <table><thead><tr><th>Period</th><th>Status</th><th>Used Date</th><th>Ticket Type</th></tr></thead>
     <tbody>${ti.periods.map(p=>`<tr><td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(p.start))} → ${fmtDDMMYYYY(new Date(p.end))}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
     </table>
     </div>
+    ${ti.bonusAwarded>0 ? `<div class="note-box" style="margin-bottom:18px;">This table only lists the regular ${ti.cycleYears}-year cycle periods. This staff member also has ${ti.bonusAwarded} separate "Employee of the Year" award-ticket entitlement(s) (a different, one-off bonus — not part of the cycle above), of which ${ti.bonusOutstanding} is/are still outstanding. That's why "Total Tickets Due" above can be higher than the number of "Due" rows in this table.</div>` : ''}
 
     <div class="section-title">Leave History (${hist.length})</div>
     <div class="note-box" style="margin-bottom:10px;">A ticket only counts as "Used" in Air Ticket History above when a record here is <b>Annual Leave</b>, Status = <b>Closed</b>, and Ticket is not "None".</div>
@@ -2553,23 +2557,39 @@ function computeGroupSerialMap(){
   return serialMap;
 }
 
+// Search supports S/N, TC No, Leave Category, and Start/End Date — matching whatever the
+// admin types, so any one of these is enough to find a specific request.
 function renderLeaveTable(){
   if(!currentUser) return;
-  const q = (document.getElementById('leaveSearch')?.value||'').toLowerCase();
+  const q = (document.getElementById('leaveSearch')?.value||'').trim().toLowerCase().replace(/^#/,'');
 
   const serialMap = computeGroupSerialMap();
 
   let list = [...leaveList];
   if(currentUser.role!=='admin') list = list.filter(l=>l.tcNo===currentUser.tcNo);
-  if(q) list = list.filter(l=> l.name.toLowerCase().includes(q) || l.tcNo.toLowerCase().includes(q));
 
   const tbody = document.getElementById('leaveTbody');
   if(!tbody) return;
 
   let groups = computeLeaveGroups(list);
+
+  if(q){
+    groups = groups.filter(g=>{
+      const sn = String(serialMap[g.groupId] || '');
+      return sn === q
+        || (g.tcNo||'').toLowerCase().includes(q)
+        || (g.name||'').toLowerCase().includes(q)
+        || (g.category||'').toLowerCase().includes(q)
+        || fmtDate(g.minStart).toLowerCase().includes(q)
+        || fmtDate(g.maxEnd).toLowerCase().includes(q)
+        || (g.minStart||'').includes(q)
+        || (g.maxEnd||'').includes(q);
+    });
+  }
+
   groups.sort((a,b)=> new Date(b.minStart) - new Date(a.minStart) || b.requestedAtSeconds - a.requestedAtSeconds);
 
-  if(groups.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:30px;">No records found</td></tr>'; return; }
+  if(groups.length===0){ tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:30px;">${q ? 'No matching leave requests' : 'No records found'}</td></tr>`; return; }
 
   tbody.innerHTML = groups.map(g=>`<tr style="cursor:pointer;" onclick="openLeaveGroupDetail('${g.groupId}')">
       <td>${serialMap[g.groupId]}</td><td>${g.tcNo}</td><td>${g.category||'—'}</td>
