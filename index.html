@@ -249,6 +249,9 @@ tr:hover td{ background:#FBFAF6; }
 tr.row-exceeds-balance{ background:var(--danger-bg) !important; }
 tr.row-exceeds-balance td{ background:var(--danger-bg); }
 tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
+tr.row-overlaps-existing{ background:#FCE4E4 !important; outline:2px solid var(--danger); outline-offset:-2px; }
+tr.row-overlaps-existing td{ background:#FCE4E4; }
+tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
 .loading-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; color:var(--slate); background:var(--cream); }
 .spinner{ width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--gold); animation:spin .8s linear infinite; }
 @keyframes spin{ to{ transform:rotate(360deg);} }
@@ -613,6 +616,7 @@ tr.row-exceeds-balance .mr-balance{ color:var(--danger); font-weight:800; }
         </div>
 
         <div class="warn-box" id="lr_balanceWarning" style="display:none; margin-top:12px;"></div>
+        <div class="warn-box" id="lr_overlapWarning" style="display:none; margin-top:12px; background:var(--danger-bg); border-color:var(--danger); color:var(--danger); font-weight:700;"></div>
 
         <div class="tbl-wrap" style="margin-top:14px;">
         <table>
@@ -1746,19 +1750,52 @@ function updateRowCalc(rowId){
   row.classList.toggle('row-exceeds-balance', exceeds);
   balanceCell.title = exceeds ? `Requested ${days} day(s) exceeds the available balance of ${balanceStr}` : '';
 
+  // Live duplicate/overlap protection — flags this row red immediately (before Save is even
+  // clicked) if its dates overlap an already-saved leave record for this staff. This is the
+  // same check enforced (with a blocking alert) at save time, surfaced here early so the
+  // admin/staff sees the problem while still filling in the form.
+  const startInput = row.querySelector('.mr-start');
+  let overlapsExisting = false;
+  const tcNo = (document.getElementById('lr_tcNo')?.value || (currentUser && currentUser.role!=='admin' ? currentUser.tcNo : '')).trim();
+  const endIso = endCell.dataset.iso;
+  if(tcNo && start && endIso){
+    const existingForStaff = leaveList.filter(l =>
+      l.tcNo===tcNo && l.status!=='Cancelled' && l.status!=='Rejected' &&
+      (!editingGroupId || (l.groupId||l.id)!==editingGroupId)
+    );
+    const conflict = existingForStaff.find(l => dateRangesOverlap(start, endIso, l.fromDate, l.toDate));
+    if(conflict){
+      overlapsExisting = true;
+      startInput.title = `⚠️ Overlaps with existing ${conflict.type} record (${fmtDate(conflict.fromDate)} → ${fmtDate(conflict.toDate)}, S/N #${computeGroupSerialMap()[conflict.groupId||conflict.id]||'?'})`;
+    }
+  }
+  if(!overlapsExisting) startInput.title = '';
+  row.classList.toggle('row-overlaps-existing', overlapsExisting);
+
   updateBalanceWarningBanner();
   updateOverallDates();
 }
 
 function updateBalanceWarningBanner(){
   const banner = document.getElementById('lr_balanceWarning');
-  if(!banner) return;
-  const exceedCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-exceeds-balance').length;
-  if(exceedCount>0){
-    banner.style.display = 'block';
-    banner.innerHTML = `⚠️ ${exceedCount} entry(ies) exceed the available leave balance — highlighted in red below. Please review, or you'll be asked to confirm before saving.`;
-  } else {
-    banner.style.display = 'none';
+  const overlapBanner = document.getElementById('lr_overlapWarning');
+  if(banner){
+    const exceedCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-exceeds-balance').length;
+    if(exceedCount>0){
+      banner.style.display = 'block';
+      banner.innerHTML = `⚠️ ${exceedCount} entry(ies) exceed the available leave balance — highlighted in red below. Please review, or you'll be asked to confirm before saving.`;
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+  if(overlapBanner){
+    const overlapCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-overlaps-existing').length;
+    if(overlapCount>0){
+      overlapBanner.style.display = 'block';
+      overlapBanner.innerHTML = `🚫 ${overlapCount} entry(ies) overlap with an already-saved leave record for this staff — highlighted in red below (hover the Start Date for details). This request cannot be saved until fixed.`;
+    } else {
+      overlapBanner.style.display = 'none';
+    }
   }
 }
 
@@ -1947,6 +1984,11 @@ function cancelLeaveRequest(){
   }
 }
 
+// True if the two inclusive date ranges [startA, endA] and [startB, endB] share any day.
+function dateRangesOverlap(startA, endA, startB, endB){
+  return new Date(startA) <= new Date(endB) && new Date(startB) <= new Date(endA);
+}
+
 async function submitLeaveRequest(){
   if(!currentUser) return;
   const isAdmin = currentUser.role==='admin';
@@ -1972,6 +2014,34 @@ async function submitLeaveRequest(){
     const docId = row.dataset.docId || null;
     if(!type || !year || !start || !days || days<=0){ toast('Please fill Leave Type, Year, Start Date and Days for every entry', 'err'); return; }
     entries.push({ docId, type, year, fromDate: start, toDate: endIso, days, remark });
+  }
+
+  // Block saving if any two entries in this SAME request overlap on a date.
+  // Uses a blocking alert() (not just a toast) so this can never be missed or auto-dismiss
+  // before being read — the person must click OK to acknowledge it.
+  for(let i=0;i<entries.length;i++){
+    for(let j=i+1;j<entries.length;j++){
+      if(dateRangesOverlap(entries[i].fromDate, entries[i].toDate, entries[j].fromDate, entries[j].toDate)){
+        alert(`⚠️ Duplicate / Overlapping Leave — Not Saved\n\nRow ${i+1} (${entries[i].type}, ${fmtDate(entries[i].fromDate)} → ${fmtDate(entries[i].toDate)}) overlaps with Row ${j+1} (${entries[j].type}, ${fmtDate(entries[j].fromDate)} → ${fmtDate(entries[j].toDate)}) in this same request.\n\nPlease fix the dates before saving.`);
+        return;
+      }
+    }
+  }
+
+  // Block saving if any entry overlaps with an ALREADY-SAVED leave record for this same
+  // staff (any other request, any leave type) — e.g. two separate requests both covering
+  // 15 July. Cancelled/Rejected records and the group currently being edited are excluded
+  // since they don't represent live, competing leave.
+  const existingForStaff = leaveList.filter(l =>
+    l.tcNo===tcNo && l.status!=='Cancelled' && l.status!=='Rejected' &&
+    (!editingGroupId || (l.groupId||l.id)!==editingGroupId)
+  );
+  for(const e of entries){
+    const conflict = existingForStaff.find(l => dateRangesOverlap(e.fromDate, e.toDate, l.fromDate, l.toDate));
+    if(conflict){
+      alert(`⚠️ Duplicate / Overlapping Leave — Not Saved\n\n${e.type} (${fmtDate(e.fromDate)} → ${fmtDate(e.toDate)}) overlaps with an existing ${conflict.type} record (${fmtDate(conflict.fromDate)} → ${fmtDate(conflict.toDate)}, S/N #${computeGroupSerialMap()[conflict.groupId||conflict.id]||'?'}) already saved for ${s.name} (TC ${tcNo}).\n\nThis request was NOT saved. Please check the existing record before trying again.`);
+      return;
+    }
   }
 
   const exceedCount = document.querySelectorAll('#matrixRowsContainer .matrix-row.row-exceeds-balance').length;
@@ -2796,10 +2866,26 @@ async function applyLocalLeave(type, fromId, toId){
   const year = new Date(from).getFullYear();
 
   const already = leaveList.filter(l=>l.type===type && l.year===year).map(l=>l.tcNo);
-  const targets = staffList.filter(s=> s.status==='Active' && !already.includes(s.tcNo));
-  if(targets.length===0){ toast('Already applied to all Active staff', 'err'); return; }
+  // Also skip anyone who already has ANY other live leave record overlapping these dates —
+  // e.g. someone already on Annual Leave over this same period — so this bulk tool can't
+  // create the same double-booking problem the Leave Request form already blocks.
+  const overlapping = new Set(
+    leaveList
+      .filter(l=> l.status!=='Cancelled' && l.status!=='Rejected' && dateRangesOverlap(l.fromDate, l.toDate, from, to))
+      .map(l=>l.tcNo)
+  );
+  const targets = staffList.filter(s=> s.status==='Active' && !already.includes(s.tcNo) && !overlapping.has(s.tcNo));
+  const skippedForOverlap = staffList.filter(s=> s.status==='Active' && !already.includes(s.tcNo) && overlapping.has(s.tcNo));
+  if(targets.length===0){
+    toast(skippedForOverlap.length>0 ? 'All remaining staff already have an overlapping leave on these dates' : 'Already applied to all Active staff', 'err');
+    return;
+  }
 
-  if(!confirm(`"${type}" (${days} days) will be applied to ${targets.length} Active staff. Continue?`)) return;
+  let confirmMsg = `"${type}" (${days} days) will be applied to ${targets.length} Active staff. Continue?`;
+  if(skippedForOverlap.length>0){
+    confirmMsg += `\n\nSkipping ${skippedForOverlap.length} staff with an existing overlapping leave: ${skippedForOverlap.map(s=>s.name).join(', ')}`;
+  }
+  if(!confirm(confirmMsg)) return;
 
   try{
     const batch = db.batch();
