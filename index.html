@@ -1195,11 +1195,7 @@ const FIXED_LEAVE_RULES = {
   "Ramadan Leave":      { daysPerYear: 5, startYear: null },
   "Hajj Leave":         { daysPerYear: 5, startYear: null }
 };
-// Fixed-entitlement Local Leave types are eligible for the "Convert to Overtime (OT)"
-// option — Annual Leave (daily-accrual, not a fixed yearly count) and Unpaid/Sick Leave
-// (no entitlement to convert) are deliberately excluded since only types listed here have a
-// defined "N days per year" entitlement pool that Taken/Converted-to-OT can be split from.
-function isOTConvertibleType(type){ return !!FIXED_LEAVE_RULES[type]; }
+
 // Air ticket entitlement cycle by staff level
 const LEVEL_TICKET_CYCLE_YEARS = { "Staff": 2, "Manager": 1 };
 let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
@@ -1948,10 +1944,13 @@ function updateRowCalc(rowId){
   const otCell = row.querySelector('.mr-ot-cell');
   const otCheckbox = row.querySelector('.mr-ot');
 
-  // The "Convert to OT" checkbox only makes sense for fixed-entitlement Local Leave types
-  // (Eid Al Fitr/Adha, National Day, Foundation Day, Ramadan, Hajj) — hide and clear it for
-  // Annual Leave, Unpaid Leave, Sick Leave, etc., which have no such entitlement to convert.
-  const otApplicable = isOTConvertibleType(type);
+  // The "Convert to OT" checkbox visibility follows the top-level Leave Category (not the
+  // individual row's Leave Type): visible for every row when Category = Local, hidden
+  // completely for Emergency and Annual Leave. When hidden, the checkbox is force-unchecked
+  // so a previously-ticked value can never silently survive a category change and affect the
+  // save or any leave/OT calculation.
+  const category = document.getElementById('lr_category')?.value;
+  const otApplicable = category==='Local';
   otCell.style.display = otApplicable ? '' : 'none';
   if(!otApplicable) otCheckbox.checked = false;
   const convertedToOT = otApplicable && otCheckbox.checked;
@@ -2146,6 +2145,9 @@ function onLrCategoryChange(){
   const category = document.getElementById('lr_category').value;
   document.getElementById('lr_ticketRow').style.display = category==='Annual Leave' ? 'block' : 'none';
   refreshTicketPeriodOptions();
+  // "Convert to OT" is only relevant for Local category — immediately show/hide it (and
+  // clear any ticked box) on every existing row the moment the category changes.
+  document.querySelectorAll('#matrixRowsContainer .matrix-row').forEach(row=> updateRowCalc(row.dataset.rowId));
 }
 
 function onLrTicketTypeChange(){
@@ -2191,7 +2193,7 @@ function openLeaveRequestPage(){
   editingGroupId = null;
   editingGroupOrigin = 'leaveDetails';
   document.getElementById('lr_serialBadge').style.display = 'none';
-  document.getElementById('lr_category').value = '';
+  document.getElementById('lr_category').value = 'Local'; // Local is the default category for every new request
   document.getElementById('lr_ticketType').value = 'None';
   document.getElementById('lr_ticketRow').style.display = 'none';
   document.getElementById('lr_ticketPeriodField').style.display = 'none';
@@ -2255,7 +2257,7 @@ async function submitLeaveRequest(){
     const remark = row.querySelector('.mr-remark').value.trim();
     const docId = row.dataset.docId || null;
     const otCell = row.querySelector('.mr-ot-cell');
-    const convertedToOT = isOTConvertibleType(type) && otCell && otCell.style.display!=='none' && row.querySelector('.mr-ot').checked;
+    const convertedToOT = category==='Local' && otCell && otCell.style.display!=='none' && row.querySelector('.mr-ot').checked;
     if(!type || !year || !start || !days || days<=0){ toast('Please fill Leave Type, Year, Start Date and Days for every entry', 'err'); return; }
     entries.push({ docId, type, year, fromDate: start, toDate: endIso, days, remark, convertedToOT });
   }
