@@ -40,7 +40,72 @@
   --radius-sm:8px;
   --shadow: 0 1px 2px rgba(14,36,57,.06), 0 8px 24px -12px rgba(14,36,57,.18);
   --shadow-lg: 0 20px 48px -16px rgba(14,36,57,.35);
+  color-scheme: light;
 }
+
+/* ===================== THEMES =====================
+   Every theme redefines the SAME variable names as :root above, so every existing rule and
+   inline style in this file (all written as var(--x)) automatically re-colors itself with no
+   further changes needed anywhere else. Applied via data-theme on <html>, which is set as
+   early as possible (see the inline script right after <body>) so it's active even on the
+   Login Page, before any data has loaded. */
+html[data-theme="dark"]{
+  --navy:#0B1520; --navy-light:#13202E; --navy-lighter:#1C2E40;
+  --gold:#D9B25C; --gold-light:#EBD08C; --gold-dim: rgba(217,178,92,.35);
+  --cream:#12181F; --white:#1A222B;
+  --ink:#EAEDF0; --slate:#9AA7B2; --slate-light:#6E7A85;
+  --border:#2B3742; --border-soft:#212A33;
+  --success:#4FAE7C; --success-bg:#16261E;
+  --warning:#D9A94E; --warning-bg:#2B2416;
+  --danger:#E07A63; --danger-bg:#2C1B18;
+  --info:#5FA9C9; --info-bg:#17262D;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --shadow-lg: 0 20px 48px -16px rgba(0,0,0,.7);
+  /* Tells the browser to render its OWN native UI (date-picker popups, checkboxes, scrollbars,
+     spin buttons on number inputs, etc.) in a dark style too — otherwise those native controls
+     would stay light and look jarring against a dark-themed page. */
+  color-scheme: dark;
+}
+html[data-theme="blue"]{
+  --navy:#0F2A52; --navy-light:#173B6E; --navy-lighter:#1F4E8F;
+  --gold:#3E7FBF; --gold-light:#6FA6DA; --gold-dim: rgba(62,127,191,.30);
+  --cream:#F4F8FC; --white:#FFFFFF;
+  --ink:#16233A; --slate:#4F6480; --slate-light:#8598AF;
+  --border:#DCE6F2; --border-soft:#EAF1F9;
+  --success:#2F7A52; --success-bg:#E7F3EC;
+  --warning:#A8781F; --warning-bg:#FBF1DF;
+  --danger:#B4432E; --danger-bg:#FBEAE5;
+  --info:#2B6E8C; --info-bg:#E7F2F7;
+  --shadow: 0 1px 2px rgba(15,42,82,.08), 0 8px 24px -12px rgba(15,42,82,.20);
+  --shadow-lg: 0 20px 48px -16px rgba(15,42,82,.35);
+}
+html[data-theme="green"]{
+  --navy:#123528; --navy-light:#1B4A38; --navy-lighter:#25604A;
+  --gold:#4E9A6F; --gold-light:#7CBE99; --gold-dim: rgba(78,154,111,.30);
+  --cream:#F4F9F5; --white:#FFFFFF;
+  --ink:#182922; --slate:#52685D; --slate-light:#87998F;
+  --border:#DCEBE1; --border-soft:#EBF4EE;
+  --success:#2F7A52; --success-bg:#E7F3EC;
+  --warning:#A8781F; --warning-bg:#FBF1DF;
+  --danger:#B4432E; --danger-bg:#FBEAE5;
+  --info:#2B6E8C; --info-bg:#E7F2F7;
+  --shadow: 0 1px 2px rgba(18,53,40,.08), 0 8px 24px -12px rgba(18,53,40,.20);
+  --shadow-lg: 0 20px 48px -16px rgba(18,53,40,.35);
+}
+html[data-theme="modern"]{
+  --navy:#20262E; --navy-light:#2B3440; --navy-lighter:#374252;
+  --gold:#1FA6A0; --gold-light:#5FC9C4; --gold-dim: rgba(31,166,160,.30);
+  --cream:#F7F8FA; --white:#FFFFFF;
+  --ink:#1B2027; --slate:#5A6472; --slate-light:#8D96A2;
+  --border:#E3E6EA; --border-soft:#EEF0F3;
+  --success:#2F7A52; --success-bg:#E7F3EC;
+  --warning:#A8781F; --warning-bg:#FBF1DF;
+  --danger:#B4432E; --danger-bg:#FBEAE5;
+  --info:#2B6E8C; --info-bg:#E7F2F7;
+  --shadow: 0 1px 2px rgba(32,38,46,.06), 0 8px 24px -12px rgba(32,38,46,.18);
+  --shadow-lg: 0 20px 48px -16px rgba(32,38,46,.30);
+}
+
 *{box-sizing:border-box; margin:0; padding:0;}
 html,body{height:100%;}
 body{
@@ -151,6 +216,13 @@ body.role-staff .admin-only{ display:none !important; }
 .my-leave-card .ring span{ font-size:16px; }
 .logout-link{ font-size:12px; color:#8FA2B4; margin-top:8px; display:inline-block; padding:4px 8px;}
 .logout-link:hover{ color:#fff; }
+.theme-swatch{ border:2px solid var(--border); border-radius:12px; padding:12px; cursor:pointer; transition:.12s; background:var(--white); }
+.theme-swatch:hover{ border-color:var(--slate-light); }
+.theme-swatch-active{ border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-dim); }
+.theme-swatch .swatch-preview{ height:46px; border-radius:8px; display:flex; overflow:hidden; margin-bottom:8px; border:1px solid var(--border-soft); }
+.theme-swatch .swatch-name{ font-size:12.5px; font-weight:700; color:var(--ink); display:flex; align-items:center; justify-content:space-between; }
+.theme-swatch .swatch-check{ display:none; color:var(--gold); font-weight:800; }
+.theme-swatch-active .swatch-check{ display:inline; }
 
 .main{ padding:26px 34px 60px; max-width:1360px; }
 .topbar{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px;}
@@ -268,6 +340,19 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
 </style>
 </head>
 <body>
+<script>
+// Apply the last-used theme on THIS browser immediately, before anything else renders, so
+// there's no flash of the default theme — including on the Login Page, before anyone has
+// signed in. Once a user logs in, resolveCurrentUser() re-applies their own saved
+// preference from their staff record (see applyTheme calls below), which also updates this
+// local copy so the correct theme is instant on this browser next time too.
+(function(){
+  try{
+    const saved = localStorage.getItem('gp_theme');
+    if(saved && saved!=='light'){ document.documentElement.setAttribute('data-theme', saved); }
+  }catch(e){}
+})();
+</script>
 
 <!-- ===================== LOADING ===================== -->
 <div id="loadingScreen" class="loading-screen">
@@ -367,6 +452,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
     <div class="side-foot">
       <div class="side-user"><span class="dot"></span> <span id="sideUserEmail">—</span></div>
       <div style="font-size:11px; color:var(--gold-light); margin-top:2px;" id="sideUserRole"></div>
+      <a class="logout-link" onclick="openThemePicker()">🎨 Theme</a>
       <a class="logout-link" onclick="doLogout()">Sign Out →</a>
     </div>
   </aside>
@@ -860,6 +946,12 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
       </div>
 
       <div class="card card-pad" style="margin-top:18px;">
+        <div class="section-title">Theme / Appearance</div>
+        <div class="sub" style="margin-bottom:14px;">Applies across the whole app — Login Page, Dashboard, every form, table and menu — and is saved to your own account, so it follows you to any device you sign in on. Each user can pick their own.</div>
+        <div id="settingsThemeSwatchGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px;"></div>
+      </div>
+
+      <div class="card card-pad" style="margin-top:18px;">
         <div class="section-title">Leave Types / Leave List Management</div>
         <div class="sub" style="margin-bottom:14px;">Manage the leave types available in the Leave Request dropdown. Inactive types stay on old records but won't show up for new requests.</div>
         <div class="grid grid-3" id="leaveTypesGrid"></div>
@@ -1011,6 +1103,17 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
         <button class="btn btn-ghost" onclick="closeModal('editLeaveModalOverlay')">Cancel</button>
         <button class="btn btn-gold" onclick="saveEditedLeave()">Save Changes</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: THEME PICKER (available to every user) ===================== -->
+<div class="overlay" id="themeModalOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3>Theme / Appearance</h3><button class="modal-close" onclick="closeModal('themeModalOverlay')">✕</button></div>
+    <div class="modal-body">
+      <div class="note-box" style="margin-bottom:16px;">Pick the look you prefer — it applies everywhere in the app, from the Login Page onward, and is saved to your own account, so it follows you the next time you sign in on any device.</div>
+      <div id="themeSwatchGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
     </div>
   </div>
 </div>
@@ -1188,9 +1291,62 @@ function resolveCurrentUser(){
   const tcNo = user.email.split('@')[0];
   const s = staffList.find(x=>x.tcNo===tcNo);
   currentUser = s ? { tcNo: s.tcNo, name: s.name, role: s.role||'staff' } : { tcNo, name: user.email, role:'admin' }; // fallback: unknown login (e.g. legacy email) treated as admin
+  applyTheme((s && s.themePreference) || 'light', false);
   applyRoleUI();
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('app').style.display='block';
+}
+
+const THEME_NAMES = { light:'Light', dark:'Dark', blue:'Blue Professional', green:'Green Professional', modern:'Modern' };
+
+// Applies a theme app-wide (Login Page through every page — every color in this file is a
+// var(--x) that these data-theme blocks override, so nothing else needs to change). Always
+// updates this browser's local copy (so the correct theme shows instantly on next load,
+// before Firestore data arrives); optionally also saves it to the signed-in user's own staff
+// record so it follows them to any device/browser they log into.
+function applyTheme(theme, save){
+  if(!THEME_NAMES[theme]) theme = 'light';
+  if(theme==='light') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', theme);
+  try{ localStorage.setItem('gp_theme', theme); }catch(e){}
+  document.querySelectorAll('.theme-swatch').forEach(el=> el.classList.toggle('theme-swatch-active', el.dataset.theme===theme));
+  if(save && currentUser){
+    db.collection('staff').doc(currentUser.tcNo).set({ themePreference: theme }, {merge:true})
+      .then(()=> toast(`Theme set to ${THEME_NAMES[theme]}`, 'ok'))
+      .catch(err=> toast('Could not save theme preference: '+err.message, 'err'));
+  }
+}
+
+// Renders one preview swatch per theme (a tiny strip of that theme's real navy/gold/cream
+// colors, taken from the same THEME_PALETTES data the CSS uses) so the user can see roughly
+// what each theme looks like before picking it, then applies + saves the chosen one.
+const THEME_PALETTES = {
+  light:  { navy:'#0E2439', gold:'#C9A24B', cream:'#FAF7F1' },
+  dark:   { navy:'#0B1520', gold:'#D9B25C', cream:'#12181F' },
+  blue:   { navy:'#0F2A52', gold:'#3E7FBF', cream:'#F4F8FC' },
+  green:  { navy:'#123528', gold:'#4E9A6F', cream:'#F4F9F5' },
+  modern: { navy:'#20262E', gold:'#1FA6A0', cream:'#F7F8FA' }
+};
+function openThemePicker(){
+  renderThemeSwatches();
+  openModalEl('themeModalOverlay');
+}
+function renderThemeSwatches(){
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const html = Object.entries(THEME_PALETTES).map(([key,p])=>`
+    <div class="theme-swatch ${key===current?'theme-swatch-active':''}" data-theme="${key}" onclick="applyTheme('${key}', true)">
+      <div class="swatch-preview">
+        <div style="flex:1.2; background:${p.navy};"></div>
+        <div style="flex:.6; background:${p.gold};"></div>
+        <div style="flex:1.8; background:${p.cream};"></div>
+      </div>
+      <div class="swatch-name">${THEME_NAMES[key]} <span class="swatch-check">✓</span></div>
+    </div>
+  `).join('');
+  ['themeSwatchGrid','settingsThemeSwatchGrid'].forEach(id=>{
+    const grid = document.getElementById(id);
+    if(grid) grid.innerHTML = html;
+  });
 }
 
 function applyRoleUI(){
@@ -1321,6 +1477,7 @@ function showView(name){
   if(name==='leaveDetails') renderLeaveTable();
   if(name==='leaveApproved') renderLeaveApproved();
   if(name==='approvals') renderApprovals();
+  if(name==='settings') renderThemeSwatches();
 }
 
 // Opens a blank Leave Request form for a brand-new submission.
