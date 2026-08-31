@@ -269,10 +269,27 @@ tbody tr:hover td *:not(.badge):not(.badge *){ color:#FFFFFF !important; }
    normal black-on-white appearance even while the row is hovered — the white-text rule above
    is meant for plain cell text/labels, not editable fields, where white-on-white would make
    the typed value unreadable. Scoped to #matrixRowsContainer specifically so no other table
-   in the app is affected. */
+   in the app is affected. This also explicitly covers <option> elements inside the Leave
+   Type dropdown — without it, opening that dropdown while the row is hovered inherited the
+   same forced white text as the rest of the row, making the option list unreadable (white
+   text on its own white popup background). */
 #matrixRowsContainer tr:hover td input,
 #matrixRowsContainer tr:hover td select,
 #matrixRowsContainer tr:hover td textarea{ color:#000000 !important; background:#FFFFFF !important; }
+/* This rule is the actual fix for the dropdown-list-turns-invisible bug: the broad white-text
+   rule above uses !important, so an option-color override WITHOUT !important can never win
+   against it (CSS always lets !important rules beat non-important ones, regardless of how
+   specific the selector is) — that's why an earlier attempt at this without !important still
+   didn't work. */
+#matrixRowsContainer select option{ color:#000000 !important; background:#FFFFFF !important; }
+/* The Delete (trash) button needs a genuinely strong, unmistakable contrast — a light-red
+   button with just a white icon on it (an earlier attempt) was too washed out to read
+   clearly, and making it conditional on :hover proved unreliable. Simplest and most robust
+   fix: the button is ALWAYS solid deep red with a white icon, in every row, all the time —
+   so it's guaranteed visible whether or not the row happens to be hovered at that moment. */
+#matrixRowsContainer .mr-delete-btn{ background:#B3261E !important; color:#FFFFFF !important; border-color:#B3261E !important; }
+#matrixRowsContainer .mr-delete-btn:hover{ background:#8E1E17 !important; }
+#matrixRowsContainer .mr-delete-btn svg{ stroke:#FFFFFF !important; }
 .tbl-wrap{ overflow-x:auto; }
 
 .badge{ display:inline-flex; align-items:center; gap:5px; padding:3.5px 10px; border-radius:20px; font-size:11.2px; font-weight:700; letter-spacing:.2px; white-space:nowrap;}
