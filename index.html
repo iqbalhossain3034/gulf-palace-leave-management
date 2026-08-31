@@ -1972,6 +1972,18 @@ function updateRowCalcDebounced(rowId){
   clearTimeout(rowCalcTimers[rowId]);
   rowCalcTimers[rowId] = setTimeout(()=> updateRowCalc(rowId), 350);
 }
+// Cancels any debounced row checks still waiting to fire. Needed at the moment Save is
+// clicked (and whenever the form is reset/reloaded): if the user clicks Save within 350ms of
+// their last keystroke, a debounced check can still be queued. Firestore's local cache
+// updates almost instantly after a successful save, so by the time that queued check finally
+// runs, the just-saved entry already exists in leaveList — and since a brand-new request has
+// no groupId to exclude yet, the check matches the entry against ITSELF and briefly flags a
+// false "overlap", even though the save already succeeded normally. Clearing pending timers
+// the moment Save is clicked removes that race entirely.
+function clearAllRowCalcTimers(){
+  Object.values(rowCalcTimers).forEach(t=> clearTimeout(t));
+  rowCalcTimers = {};
+}
 
 function updateRowCalc(rowId){
   const row = document.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
@@ -2240,6 +2252,7 @@ function refreshTicketPeriodOptions(){
 }
 
 function openLeaveRequestPage(){
+  clearAllRowCalcTimers();
   editingGroupId = null;
   editingGroupOrigin = 'leaveDetails';
   document.getElementById('lr_serialBadge').style.display = 'none';
@@ -2270,6 +2283,7 @@ function openLeaveRequestPage(){
 }
 
 function cancelLeaveRequest(){
+  clearAllRowCalcTimers();
   if(editingGroupId){
     editingGroupId = null;
     showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
@@ -2286,6 +2300,10 @@ function dateRangesOverlap(startA, endA, startB, endB){
 
 async function submitLeaveRequest(){
   if(!currentUser) return;
+  // Cancel any pending debounced live-checks the instant Save is clicked — otherwise one
+  // could still fire moments later and briefly (falsely) flag the just-saved entry as
+  // overlapping itself. See clearAllRowCalcTimers() for the full explanation.
+  clearAllRowCalcTimers();
   const isAdmin = currentUser.role==='admin';
   if(editingGroupId && !isAdmin){ toast('You do not have permission to edit this request', 'err'); return; }
   const category = document.getElementById('lr_category').value;
@@ -2891,6 +2909,7 @@ function renderLeaveTable(){
 // previously submitted group's entries, so it can be reviewed — and by Admin, edited — with
 // every function of that page (Add Matrix, Ticket Type, balance checks, Print) intact.
 function openLeaveGroupDetail(groupId, origin){
+  clearAllRowCalcTimers();
   const entries = leaveList.filter(l => (l.groupId || l.id) === groupId)
     .sort((a,b)=> new Date(a.fromDate) - new Date(b.fromDate));
   if(entries.length===0) return;
@@ -2984,6 +3003,7 @@ function updateLrStatusPanel(groupId){
 
 async function deleteEntireGroupFromForm(){
   if(!editingGroupId) return;
+  clearAllRowCalcTimers();
   const entries = leaveList.filter(l => (l.groupId || l.id) === editingGroupId);
   if(entries.length===0) return;
   if(!confirm(`Delete this entire leave request (${entries.length} entr${entries.length===1?'y':'ies'})? This cannot be undone.`)) return;
