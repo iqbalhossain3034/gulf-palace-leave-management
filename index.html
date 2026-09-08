@@ -2783,42 +2783,39 @@ function openStaffDetail(tcNo){
     </div>
     <div class="note-box" style="margin-bottom:18px;">"Converted to OT" days come from Leave Request entries where the "Convert to OT" checkbox was ticked instead of taking the days as actual leave — they still draw down this table's Entitlement the same as Leave Taken does, just recorded separately for Accounts.</div>
 
-    <div class="section-title" style="margin-bottom:10px;">Year-by-Year Local Leave — Taken &amp; Remaining</div>
+    <div class="section-title" style="margin-bottom:10px;">Year-by-Year Local Leave — Outstanding Days</div>
     <div class="tbl-wrap" style="margin-bottom:6px;">
-    <table><thead><tr><th>Year</th><th>Entitlement</th><th>Taken</th><th>Converted to OT</th><th>Remaining</th></tr></thead>
+    <table><thead><tr><th>Year</th><th>Eid Al Fitr</th><th>Eid Al Adha</th><th>National Day</th><th>Foundation Day</th><th>Outstanding (Total)</th></tr></thead>
     <tbody>${(()=>{
       const joinYear = new Date(s.joiningDate).getFullYear();
       const curYear = new Date().getFullYear();
-      // Combines Eid Al Fitr, Eid Al Adha, National Day, and Foundation Day into ONE simple
-      // per-year figure — "how many local leave days were entitled, taken, and remaining that
-      // year" — rather than a separate column per leave type.
       const yearTypes = ['Eid Al Fitr Leave','Eid Al Adha Leave','National Day','Foundation Day'];
       let rows = '';
       for(let y=curYear; y>=joinYear; y--){
-        let entitlement=0, taken=0, convertedOT=0;
-        yearTypes.forEach(type=>{
-          entitlement += fixedLeaveEntitlementForYear(type, s, y);
-          taken += fixedLeaveTakenDays(s.tcNo, type, y, null);
-          convertedOT += fixedLeaveConvertedOTDays(s.tcNo, type, y, null);
-        });
-        if(entitlement<=0 && taken<=0 && convertedOT<=0) continue; // nothing applicable this year — skip the row
-        const remaining = entitlement - taken - convertedOT;
-        const remainingHtml = remaining>0
-          ? `<span style="color:var(--danger); font-weight:800;">${remaining} day(s) left</span>`
-          : `<span style="color:var(--success); font-weight:700;">0 — fully taken</span>`;
+        let yearTotalOutstanding = 0;
+        const cells = yearTypes.map(type=>{
+          const entitlement = fixedLeaveEntitlementForYear(type, s, y);
+          if(entitlement<=0) return '<td style="color:var(--slate);">—</td>';
+          const taken = fixedLeaveTakenDays(s.tcNo, type, y, null);
+          const convertedOT = fixedLeaveConvertedOTDays(s.tcNo, type, y, null);
+          const remaining = entitlement - taken - convertedOT;
+          yearTotalOutstanding += Math.max(0, remaining);
+          const remainingHtml = remaining>0
+            ? `<span style="color:var(--danger); font-weight:800;">${remaining} left</span>`
+            : `<span style="color:var(--success);">done</span>`;
+          return `<td>${taken}/${entitlement}${convertedOT>0?` <span style="color:var(--warning);" title="${convertedOT} day(s) converted to OT">+${convertedOT} OT</span>`:''} — ${remainingHtml}</td>`;
+        }).join('');
         rows += `<tr>
           <td style="font-weight:700;">${y}</td>
-          <td>${entitlement}</td>
-          <td>${taken}</td>
-          <td>${convertedOT>0?convertedOT:'—'}</td>
-          <td>${remainingHtml}</td>
+          ${cells}
+          <td style="${yearTotalOutstanding>0?'color:var(--danger); font-weight:800;':'color:var(--success); font-weight:700;'}">${yearTotalOutstanding>0 ? yearTotalOutstanding+' day(s)' : '0'}</td>
         </tr>`;
       }
-      return rows || '<tr><td colspan="5" style="text-align:center; color:var(--slate); padding:20px;">No local leave history yet</td></tr>';
+      return rows;
     })()}</tbody>
     </table>
     </div>
-    <div class="note-box" style="margin-bottom:18px;">Each year combines Eid Al Fitr, Eid Al Adha, National Day, and Foundation Day into one total — "Entitlement" is what was owed that year, "Taken" is what was actually used as leave, and "Remaining" is what's still outstanding for that year.</div>
+    <div class="note-box" style="margin-bottom:18px;">Each cell reads "days taken / days entitled for that year". A red "left" means that year's entitlement for that leave type hasn't been fully used yet — the "Outstanding (Total)" column adds up everything still owed to this staff member across Eid Al Fitr, Eid Al Adha, National Day, and Foundation Day for that specific year.</div>
 
     <div class="section-title">Air Ticket History</div>
     <div class="k-v" style="font-weight:800;"><span>Total Tickets Due (from ${ti.cycleYears}-year contract periods below)</span><span>${ti.totalDue}</span></div>
