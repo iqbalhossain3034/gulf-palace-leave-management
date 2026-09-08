@@ -236,7 +236,34 @@ body.role-staff .admin-only{ display:none !important; }
 .grid-3{ grid-template-columns:repeat(3,1fr); }
 .grid-2{ grid-template-columns:repeat(2,1fr); }
 @media (max-width:1180px){ .grid-5{grid-template-columns:repeat(3,1fr);} .grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);} }
-@media (max-width:760px){ .grid-5,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;} .shell{grid-template-columns:1fr;} .sidebar{position:relative; height:auto;} }
+@media (max-width:760px){
+  .grid-5,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}
+  .shell{grid-template-columns:1fr;}
+  /* The sidebar becomes an off-canvas drawer on mobile/tablet — hidden by default, slid in
+     from the left over the content (not pushed above it) when the hamburger button is
+     tapped, with a dimmed backdrop behind it. Toggled via .sidebar.open / #mobileTopbar. */
+  .sidebar{
+    position:fixed; top:0; left:0; height:100vh; width:250px; z-index:210;
+    transform:translateX(-100%); transition:transform .22s ease; box-shadow:var(--shadow-lg);
+  }
+  .sidebar.open{ transform:translateX(0); }
+  .mobile-sidebar-overlay{
+    display:none; position:fixed; inset:0; background:rgba(11,21,32,.5); z-index:205;
+  }
+  .mobile-sidebar-overlay.open{ display:block; }
+  #mobileTopbar{ display:flex; }
+  .main{ padding:18px 16px 50px; }
+}
+@media (min-width:761px){ #mobileTopbar{ display:none; } }
+#mobileTopbar{
+  align-items:center; gap:12px; background:var(--navy); color:#fff; padding:12px 16px;
+  position:sticky; top:0; z-index:150;
+}
+#mobileTopbar button{
+  background:none; border:none; color:#fff; padding:4px; cursor:pointer; display:flex;
+}
+#mobileTopbar .side-brand{ padding:0; border:none; margin:0; }
+#mobileTopbar .side-brand strong, #mobileTopbar .side-brand span{ color:#fff; }
 
 .card{ background:var(--white); border:1px solid var(--border-soft); border-radius:var(--radius); box-shadow:var(--shadow); }
 .card-pad{ padding:20px 22px; }
@@ -335,7 +362,7 @@ tbody tr:hover td *:not(.badge):not(.badge *){ color:#FFFFFF !important; }
 .modal-foot{ padding:16px 24px; border-top:1px solid var(--border-soft); display:flex; justify-content:flex-end; gap:10px; }
 .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .form-row.c3{ grid-template-columns:1fr 1fr 1fr; }
-@media (max-width:560px){ .form-row,.form-row.c3{grid-template-columns:1fr;} }
+@media (max-width:700px){ .form-row,.form-row.c3{grid-template-columns:1fr;} }
 .hint{ font-size:11.5px; color:var(--slate-light); margin-top:4px; }
 
 /* ---------- toast ---------- */
@@ -419,8 +446,17 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
 <div id="app">
 <div class="shell">
 
+  <!-- Mobile-only top bar with hamburger toggle — hidden on desktop via CSS above -->
+  <div id="mobileTopbar">
+    <button onclick="toggleMobileSidebar()" aria-label="Open menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="side-brand"><div class="mark">GP</div><div class="txt"><strong>Gulf Palace</strong></div></div>
+  </div>
+  <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebarEl">
     <div class="side-brand">
       <div class="mark">GP</div>
       <div class="txt">
@@ -1561,6 +1597,20 @@ function showView(name){
   if(name==='leaveApproved') renderLeaveApproved();
   if(name==='approvals') renderApprovals();
   if(name==='settings') renderThemeSwatches();
+  closeMobileSidebar(); // tapping any nav item closes the mobile drawer, so the person lands
+                        // straight on the page content instead of the menu staying open over it
+  window.scrollTo(0,0);
+}
+
+// Mobile/tablet off-canvas sidebar controls (desktop ignores these — the sidebar there is
+// always visible via CSS, this only matters below the 760px breakpoint).
+function toggleMobileSidebar(){
+  document.getElementById('sidebarEl').classList.toggle('open');
+  document.getElementById('mobileSidebarOverlay').classList.toggle('open');
+}
+function closeMobileSidebar(){
+  document.getElementById('sidebarEl').classList.remove('open');
+  document.getElementById('mobileSidebarOverlay').classList.remove('open');
 }
 
 // Opens a blank Leave Request form for a brand-new submission.
@@ -2301,7 +2351,16 @@ function openLeaveRequestPage(){
   clearAllRowCalcTimers();
   editingGroupId = null;
   editingGroupOrigin = 'leaveDetails';
-  document.getElementById('lr_serialBadge').style.display = 'none';
+  // Show the S/N this request will get as soon as the page opens — before it's even saved —
+  // by predicting its position: it'll be the newest group once saved, so it takes the next
+  // number after every group that already exists right now. This becomes the request's real,
+  // permanent S/N once saved (computeGroupSerialMap() assigns it the same way), UNLESS another
+  // person happens to save a different new request in the few moments before this one is
+  // saved — an unlikely, small-team edge case, but worth knowing about.
+  const serialMap = computeGroupSerialMap();
+  const predictedSerial = Object.keys(serialMap).length + 1;
+  document.getElementById('lr_serialBadgeVal').textContent = predictedSerial;
+  document.getElementById('lr_serialBadge').style.display = '';
   document.getElementById('lr_category').value = 'Local'; // Local is the default category for every new request
   document.getElementById('lr_otHeaderCell').style.display = ''; // show the OT column header, matching the Local default above
   document.getElementById('lr_ticketType').value = 'None';
