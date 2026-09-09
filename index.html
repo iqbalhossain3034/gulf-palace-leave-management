@@ -224,7 +224,15 @@ body.role-staff .admin-only{ display:none !important; }
 .theme-swatch .swatch-check{ display:none; color:var(--gold); font-weight:800; }
 .theme-swatch-active .swatch-check{ display:inline; }
 
-.main{ padding:26px 34px 60px; max-width:1360px; }
+/* min-width:0 is essential here: .main is a CSS Grid child (the "1fr" track in .shell), and
+   by default a grid item's minimum width is "auto" — meaning it won't shrink smaller than the
+   widest thing inside it, EVEN IF that thing has its own overflow-x:auto scroll box. Without
+   this override, a wide table anywhere on the page (like the Leave Request matrix) silently
+   stretches the ENTIRE .main column wider than the viewport instead of scrolling within its
+   own box — pushing unrelated content (like the form fields above it) off-screen too, with no
+   scrollbar anywhere to reach it. This one line is what actually makes every .tbl-wrap's
+   horizontal scrollbar work as intended, on any page. */
+.main{ padding:26px 34px 60px; max-width:1360px; min-width:0; }
 .topbar{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px;}
 .topbar h2{ font-size:24px; color:var(--navy); }
 .topbar .sub{ color:var(--slate); font-size:13px; margin-top:3px; }
