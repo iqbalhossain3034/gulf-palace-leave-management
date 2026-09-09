@@ -357,6 +357,19 @@ tbody tr:hover td *:not(.badge):not(.badge *){ color:#FFFFFF !important; }
 .search-box input{ width:100%; padding:10px 12px 10px 36px; border:1.5px solid var(--border); border-radius:10px; font-size:13.5px; background:var(--white);}
 .search-box input:focus{ outline:none; border-color:var(--gold); }
 .search-box svg{ position:absolute; left:11px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--slate-light);}
+/* Custom TC No autocomplete (replaces native <datalist>, which barely works on mobile
+   browsers — iOS Safari in particular). Fully custom-rendered so tapping/clicking a
+   suggestion works reliably on every device, not dependent on OS-level dropdown rendering. */
+.tc-suggestions{
+  position:absolute; top:100%; left:0; right:0; z-index:30; margin-top:4px;
+  background:var(--white); border:1.5px solid var(--border); border-radius:10px;
+  box-shadow:var(--shadow-lg); max-height:260px; overflow-y:auto;
+}
+.tc-suggestion-item{ padding:10px 14px; cursor:pointer; font-size:13.5px; color:var(--ink); border-bottom:1px solid var(--border-soft); }
+.tc-suggestion-item:last-child{ border-bottom:none; }
+.tc-suggestion-item:hover, .tc-suggestion-item.tc-suggestion-active{ background:var(--cream); }
+.tc-suggestion-item b{ color:var(--navy); }
+.tc-suggestion-item .tc-suggestion-name{ color:var(--slate); font-size:12px; margin-top:1px; }
 .select-pill{ padding:9px 12px; border-radius:10px; border:1.5px solid var(--border); background:var(--white); font-size:13px; color:var(--ink); }
 
 .empty{ text-align:center; padding:50px 20px; color:var(--slate); }
@@ -745,10 +758,12 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
               <option value="Annual Leave">Annual Leave</option>
             </select>
           </div>
-          <div class="field admin-only" id="lr_staffField">
+          <div class="field admin-only" id="lr_staffField" style="position:relative;">
             <label>TC No *</label>
-            <input type="text" id="lr_tcNo" list="staffTcDatalist" placeholder="Select or type TC No" oninput="onLrTcNoChange()">
-            <datalist id="staffTcDatalist"></datalist>
+            <input type="text" id="lr_tcNo" placeholder="Select or type TC No" autocomplete="off"
+              oninput="onLrTcNoChange(); showTcSuggestions();"
+              onfocus="showTcSuggestions();">
+            <div id="lr_tcSuggestions" class="tc-suggestions" style="display:none;"></div>
           </div>
           <div class="field admin-only" id="lr_staffNameField">
             <label>Staff Name</label>
@@ -3231,12 +3246,43 @@ function renderStaffSelects(){
     sel.innerHTML = '<option value="">— manual entry —</option>' + activeStaff.map(s=>`<option value="${s.tcNo}">${s.name} (TC ${s.tcNo})</option>`).join('');
     sel.value = currentVal;
   });
-  // Leave Request TC No datalist (dropdown suggestions + free typing, admin only)
-  const dl = document.getElementById('staffTcDatalist');
-  if(dl){
-    dl.innerHTML = activeStaff.map(s=>`<option value="${s.tcNo}">${s.name}</option>`).join('');
-  }
 }
+
+// Custom TC No autocomplete for the Leave Request form — shows a filtered, tappable list of
+// active staff (TC No + Name) under the input. Replaces the old native <datalist> approach,
+// which mobile browsers (especially iOS Safari) render poorly or not at all.
+function showTcSuggestions(){
+  const input = document.getElementById('lr_tcNo');
+  const box = document.getElementById('lr_tcSuggestions');
+  if(!input || !box) return;
+  const q = input.value.trim().toLowerCase();
+  const activeStaff = staffList.filter(s=>s.status!=='Resigned');
+  const matches = (q
+    ? activeStaff.filter(s=> s.tcNo.toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q))
+    : activeStaff
+  ).slice(0, 30);
+  if(matches.length===0){ box.style.display='none'; box.innerHTML=''; return; }
+  box.innerHTML = matches.map(s=>
+    `<div class="tc-suggestion-item" onmousedown="selectTcSuggestion('${s.tcNo}')">
+      <b>${s.tcNo}</b>
+      <div class="tc-suggestion-name">${s.name}</div>
+    </div>`
+  ).join('');
+  box.style.display = '';
+}
+function selectTcSuggestion(tcNo){
+  const input = document.getElementById('lr_tcNo');
+  input.value = tcNo;
+  document.getElementById('lr_tcSuggestions').style.display = 'none';
+  onLrTcNoChange();
+}
+document.addEventListener('click', function(e){
+  const field = document.getElementById('lr_staffField');
+  if(field && !field.contains(e.target)){
+    const box = document.getElementById('lr_tcSuggestions');
+    if(box) box.style.display = 'none';
+  }
+});
 
 /* ---- start / close / cancel leave ---- */
 async function startLeave(id){
