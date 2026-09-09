@@ -762,7 +762,8 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
             <label>TC No *</label>
             <input type="text" id="lr_tcNo" placeholder="Select or type TC No" autocomplete="off"
               oninput="onLrTcNoChange(); showTcSuggestions();"
-              onfocus="showTcSuggestions();">
+              onfocus="showTcSuggestions();"
+              onclick="showTcSuggestions();">
             <div id="lr_tcSuggestions" class="tc-suggestions" style="display:none;"></div>
           </div>
           <div class="field admin-only" id="lr_staffNameField">
