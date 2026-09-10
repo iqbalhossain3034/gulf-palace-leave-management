@@ -762,8 +762,8 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
             <label>TC No *</label>
             <input type="text" id="lr_tcNo" placeholder="Select or type TC No" autocomplete="off"
               oninput="onLrTcNoChange(); showTcSuggestions();"
-              onfocus="showTcSuggestions();"
-              onclick="showTcSuggestions();">
+              onfocus="showTcSuggestions(true);"
+              onclick="showTcSuggestions(true);">
             <div id="lr_tcSuggestions" class="tc-suggestions" style="display:none;"></div>
           </div>
           <div class="field admin-only" id="lr_staffNameField">
@@ -2436,6 +2436,17 @@ async function submitLeaveRequest(){
   // could still fire moments later and briefly (falsely) flag the just-saved entry as
   // overlapping itself. See clearAllRowCalcTimers() for the full explanation.
   clearAllRowCalcTimers();
+  // Also clear any leftover warning banner/red-row highlighting immediately — without this,
+  // a warning shown a moment ago while still typing could stay visible on screen through the
+  // whole save (which takes a moment over the network), making a perfectly valid save look
+  // like it's showing a duplicate error before going through. The real, authoritative
+  // duplicate check below still runs fresh every time regardless of this visual reset.
+  document.querySelectorAll('#matrixRowsContainer .matrix-row').forEach(row=>{
+    row.classList.remove('row-exceeds-balance','row-overlaps-existing');
+    const startInput = row.querySelector('.mr-start');
+    if(startInput) startInput.title = '';
+  });
+  updateBalanceWarningBanner();
   const isAdmin = currentUser.role==='admin';
   if(editingGroupId && !isAdmin){ toast('You do not have permission to edit this request', 'err'); return; }
   const category = document.getElementById('lr_category').value;
@@ -3252,11 +3263,15 @@ function renderStaffSelects(){
 // Custom TC No autocomplete for the Leave Request form — shows a filtered, tappable list of
 // active staff (TC No + Name) under the input. Replaces the old native <datalist> approach,
 // which mobile browsers (especially iOS Safari) render poorly or not at all.
-function showTcSuggestions(){
+function showTcSuggestions(forceAll){
   const input = document.getElementById('lr_tcNo');
   const box = document.getElementById('lr_tcSuggestions');
   if(!input || !box) return;
-  const q = input.value.trim().toLowerCase();
+  // On a click, always show the FULL staff list to browse — not just what's already typed.
+  // Without this, clicking a field that already holds a selected TC No would filter down to
+  // that one matching entry only, which looks like the dropdown "isn't working" since nothing
+  // useful appears to pick from. Live typing (oninput) still filters normally.
+  const q = forceAll ? '' : input.value.trim().toLowerCase();
   const activeStaff = staffList.filter(s=>s.status!=='Resigned');
   const matches = (q
     ? activeStaff.filter(s=> s.tcNo.toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q))
@@ -3264,7 +3279,7 @@ function showTcSuggestions(){
   ).slice(0, 30);
   if(matches.length===0){ box.style.display='none'; box.innerHTML=''; return; }
   box.innerHTML = matches.map(s=>
-    `<div class="tc-suggestion-item" onmousedown="selectTcSuggestion('${s.tcNo}')">
+    `<div class="tc-suggestion-item" onmousedown="event.preventDefault(); selectTcSuggestion('${s.tcNo}')">
       <b>${s.tcNo}</b>
       <div class="tc-suggestion-name">${s.name}</div>
     </div>`
@@ -3276,6 +3291,7 @@ function selectTcSuggestion(tcNo){
   input.value = tcNo;
   document.getElementById('lr_tcSuggestions').style.display = 'none';
   onLrTcNoChange();
+  input.focus();
 }
 document.addEventListener('click', function(e){
   const field = document.getElementById('lr_staffField');
