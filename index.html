@@ -810,14 +810,14 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
         <div class="tbl-wrap" style="margin-top:14px;">
         <table>
           <thead><tr>
-            <th style="min-width:150px;">Leave Type</th>
+            <th style="min-width:135px;">Leave Type</th>
             <th>Balance</th>
-            <th style="min-width:75px;">Year</th>
-            <th style="min-width:135px;">Start Date</th>
+            <th style="min-width:65px;">Year</th>
+            <th style="min-width:125px;">Start Date</th>
             <th>End Date</th>
-            <th style="min-width:70px;">Days</th>
-            <th id="lr_otHeaderCell" style="min-width:70px; display:none;">OT</th>
-            <th style="min-width:110px;">Remark</th>
+            <th style="min-width:55px;">Days</th>
+            <th id="lr_otHeaderCell" style="min-width:44px; width:44px; padding-left:6px; padding-right:6px; text-align:center; display:none;">OT</th>
+            <th style="min-width:100px;">Remark</th>
             <th></th>
           </tr></thead>
           <tbody id="matrixRowsContainer"></tbody>
@@ -2032,20 +2032,20 @@ function matrixRowHTML(rowId, prefillStart, entry){
   }
   return `<tr class="matrix-row" data-row-id="${rowId}" data-doc-id="${docId}">
     <td>
-      <select class="mr-type" style="min-width:145px;" onchange="updateRowCalcDebounced('${rowId}')">
+      <select class="mr-type" style="width:135px;" onchange="updateRowCalcDebounced('${rowId}')">
         <option value="">Select Leave Type</option>
         ${typeOptions}
       </select>
     </td>
     <td class="mr-balance" style="white-space:nowrap;">—</td>
-    <td><input type="number" class="mr-year" placeholder="${thisYear}" value="${entry?.year||''}" oninput="updateRowCalcDebounced('${rowId}')" style="width:65px;"></td>
-    <td><input type="date" class="mr-start" value="${entry?.fromDate || prefillStart || ''}" onchange="updateRowCalcDebounced('${rowId}')" style="min-width:130px;"></td>
+    <td><input type="number" class="mr-year" placeholder="${thisYear}" value="${entry?.year||''}" oninput="updateRowCalcDebounced('${rowId}')" style="width:58px;"></td>
+    <td><input type="date" class="mr-start" value="${entry?.fromDate || prefillStart || ''}" onchange="updateRowCalcDebounced('${rowId}')" style="width:122px;"></td>
     <td class="mr-end" style="white-space:nowrap; color:var(--slate);">—</td>
-    <td><input type="number" min="1" class="mr-days" placeholder="Days" value="${entry?.days||''}" oninput="updateRowCalcDebounced('${rowId}')" style="width:60px;"></td>
-    <td class="mr-ot-cell" style="text-align:center; display:none;">
-      <input type="checkbox" class="mr-ot" ${entry?.convertedToOT ? 'checked' : ''} onchange="updateRowCalcDebounced('${rowId}')" title="Mark these days as converted to Overtime (OT) instead of taken as leave — they'll still count against this leave type's yearly entitlement, just recorded as OT instead of Leave Taken.">
+    <td><input type="number" min="1" class="mr-days" placeholder="Days" value="${entry?.days||''}" oninput="updateRowCalcDebounced('${rowId}')" style="width:50px;"></td>
+    <td class="mr-ot-cell" style="text-align:center; padding-left:6px; padding-right:6px; display:none;">
+      <input type="checkbox" class="mr-ot" style="margin:0; display:block; margin-left:auto; margin-right:auto;" ${entry?.convertedToOT ? 'checked' : ''} onchange="updateRowCalcDebounced('${rowId}')" title="Mark these days as converted to Overtime (OT) instead of taken as leave — they'll still count against this leave type's yearly entitlement, just recorded as OT instead of Leave Taken.">
     </td>
-    <td><input type="text" class="mr-remark" placeholder="Optional" value="${entry?.remark||''}" style="min-width:110px;"></td>
+    <td><input type="text" class="mr-remark" placeholder="Optional" value="${entry?.remark||''}" style="width:100px;"></td>
     <td><button type="button" class="btn btn-danger btn-sm mr-delete-btn" title="Delete this leave entry" onclick="removeMatrixRow('${rowId}')"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg></button></td>
   </tr>`;
 }
