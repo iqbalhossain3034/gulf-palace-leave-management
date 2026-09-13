@@ -1112,8 +1112,12 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
         <div class="sub" style="margin-top:2px;">Determines this staff member's National Day / Foundation Day entitlement (Settings → Holiday Leave Policy).</div>
       </div>
       <div class="form-row c3">
-        <div class="field"><label>Job Band</label><input id="s_jobBand" placeholder="e.g. Band 3"></div>
-        <div class="field"><label>Level <span class="hint">(sets air ticket cycle)</span></label>
+        <div class="field">
+          <label>Job Band * <span class="hint">(1–6 = 1yr contract; 7–10 = 2yr contract)</span></label>
+          <input type="number" id="s_jobBand" min="1" max="10" placeholder="1–10" oninput="onJobBandOrContractStartChange()">
+          <div class="hint" id="s_jobBandRuleHint" style="margin-top:4px;"></div>
+        </div>
+        <div class="field"><label>Level <span class="hint">(fallback only — see Job Band above)</span></label>
           <select id="s_level"><option value="Staff">Staff — 1 ticket every 2 years</option><option value="Manager">Manager — 1 ticket every year</option></select>
         </div>
         <div class="field"><label>App Role</label>
@@ -1135,8 +1139,8 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
       </div>
       <div class="form-row c3">
         <div class="field"><label>Joining Date *</label><input type="date" id="s_joining"></div>
-        <div class="field"><label>Contract Start</label><input type="date" id="s_contractStart"></div>
-        <div class="field"><label>Contract End</label><input type="date" id="s_contractEnd"></div>
+        <div class="field"><label>Contract Start</label><input type="date" id="s_contractStart" onchange="onJobBandOrContractStartChange()"></div>
+        <div class="field"><label>Contract End <span class="hint">(auto-filled from Job Band — editable if needed)</span></label><input type="date" id="s_contractEnd"></div>
       </div>
       <div class="form-row c3">
         <div class="field"><label>Basic Salary</label><input type="number" id="s_salary" value="0"></div>
@@ -1364,8 +1368,19 @@ function holidayDaysPerYearFor(type, staff){
 // defined "N days per year" entitlement pool that Taken/Converted-to-OT can be split from.
 function isOTConvertibleType(type){ return !!FIXED_LEAVE_RULES[type]; }
 
-// Air ticket entitlement cycle by staff level
+// Air ticket entitlement cycle by staff level — only used as a FALLBACK when a staff member
+// doesn't have a valid Job Band (1–10) set. Job Band is the primary driver now (see
+// jobBandContractYears() below): Band 1–6 -> 1 year contract & ticket cycle, Band 7–10 -> 2
+// years for both, contract period and air ticket entitlement always kept in sync.
 const LEVEL_TICKET_CYCLE_YEARS = { "Staff": 2, "Manager": 1 };
+// Returns 1 or 2 (years) for a valid Job Band 1–10, or null if the band isn't set/valid —
+// shared by both the contract-end auto-fill and the air ticket cycle calculation, so the two
+// can never drift out of sync with each other.
+function jobBandContractYears(jobBand){
+  const band = Number(jobBand);
+  if(!band || band<1 || band>10) return null;
+  return band<=6 ? 1 : 2;
+}
 let matrixRowSeq = 0; // unique id generator for Leave Request matrix rows
 let editingGroupId = null; // null = new request; set = editing an existing submitted group on the Leave Request page
 let editingGroupOrigin = 'leaveDetails'; // which page to return to after viewing/approving a group: 'leaveDetails' or 'approvals'
@@ -1732,6 +1747,8 @@ function tenureYearsMonthsDays(joiningDate){
 
 // Air ticket cycle length depends on the staff's Level: Staff = every 2 years, Manager = every year.
 function ticketCycleYearsForStaff(staff){
+  const bandYears = jobBandContractYears(staff.jobBand);
+  if(bandYears) return bandYears;
   return LEVEL_TICKET_CYCLE_YEARS[staff.level] || LEVEL_TICKET_CYCLE_YEARS['Staff'];
 }
 
@@ -2707,6 +2724,7 @@ function openStaffModal(tcNo){
   document.getElementById('s_joining').value = s?.joiningDate||'';
   document.getElementById('s_contractStart').value = s?.contractStart||'';
   document.getElementById('s_contractEnd').value = s?.contractEnd||'';
+  updateJobBandRuleHint(); // show the Band 1–10 rule hint for whatever's loaded above
   document.getElementById('s_salary').value = s?.salary||0;
   document.getElementById('s_food').value = s?.food||0;
   document.getElementById('s_house').value = s?.house||0;
@@ -2722,6 +2740,28 @@ function openStaffModal(tcNo){
   else { preview.style.backgroundImage = 'none'; preview.textContent = s? s.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase() : '?'; }
   document.getElementById('s_loginStatus').innerHTML = 'Username will be the staff\'s TC number (example: TC 3034 -> Username <b>3034</b>).';
   openModalEl('staffModalOverlay');
+}
+
+// Job Band drives both Contract Period and Air Ticket cycle together, so they can never
+// drift out of sync: Band 1–6 -> 1 year for both, Band 7–10 -> 2 years for both. Contract End
+// is auto-filled as a convenience (Contract Start + that many years) whenever the Job Band or
+// Start Date changes, but the field stays editable in case an exception is ever needed.
+function onJobBandOrContractStartChange(){
+  updateJobBandRuleHint();
+  const years = jobBandContractYears(document.getElementById('s_jobBand').value);
+  const start = document.getElementById('s_contractStart').value;
+  if(!years || !start) return;
+  const end = new Date(start);
+  end.setFullYear(end.getFullYear() + years);
+  document.getElementById('s_contractEnd').value = end.toISOString().slice(0,10);
+}
+function updateJobBandRuleHint(){
+  const hint = document.getElementById('s_jobBandRuleHint');
+  if(!hint) return;
+  const years = jobBandContractYears(document.getElementById('s_jobBand').value);
+  hint.textContent = years
+    ? `→ ${years}-year contract, 1 round-trip air ticket every ${years} year${years>1?'s':''}`
+    : 'Enter a Job Band from 1–10 to auto-fill the contract period and ticket cycle.';
 }
 
 // Reads the chosen image, downsizes it to keep Firestore doc size small, and previews it.
