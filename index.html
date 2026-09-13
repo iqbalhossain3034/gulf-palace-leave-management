@@ -1227,6 +1227,26 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
   </div>
 </div>
 
+<!-- ===================== MODAL: STAFF DELETE — ADMIN PASSWORD CONFIRMATION ===================== -->
+<div class="overlay" id="staffDeleteAuthOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3>Confirm Deletion</h3><button class="modal-close" onclick="cancelStaffDeleteAuth()">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="staffDeleteAuthTcNo">
+      <div class="note-box" style="margin-bottom:16px; background:var(--danger-bg); color:var(--danger);">You're about to permanently delete <b id="staffDeleteAuthName">this staff member</b>'s entire record. This cannot be undone. Enter your Admin password to confirm.</div>
+      <div class="field">
+        <label>Admin Password *</label>
+        <input type="password" id="staffDeleteAuthPassword" placeholder="••••••••" autocomplete="off" onkeydown="if(event.key==='Enter') confirmStaffDeleteWithPassword();">
+      </div>
+      <div id="staffDeleteAuthError" style="color:var(--danger); font-size:12.5px; margin-top:6px; display:none;"></div>
+      <div style="display:flex; gap:10px; margin-top:18px;">
+        <button class="btn btn-danger" id="staffDeleteAuthConfirmBtn" onclick="confirmStaffDeleteWithPassword()">Delete Permanently</button>
+        <button class="btn btn-outline" onclick="cancelStaffDeleteAuth()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== MODAL: THEME PICKER (available to every user) ===================== -->
 <div class="overlay" id="themeModalOverlay">
   <div class="modal">
@@ -2791,10 +2811,53 @@ async function saveStaff(){
   }catch(err){ toast('Save failed: '+err.message, 'err'); }
 }
 
-async function deleteStaff(tcNo){
-  if(!confirm('This will delete all of this staff\'s data. Are you sure?')) return;
-  try{ await db.collection('staff').doc(tcNo).delete(); toast('Staff deleted','ok'); }
-  catch(err){ toast('Delete failed: '+err.message,'err'); }
+// Deleting a staff record is permanent and destructive, so it requires the admin to
+// re-enter their own password before it actually happens — protects against an accidental
+// tap/click on the Delete button. The password is verified via Firebase's own
+// reauthenticateWithCredential (server-side check against the signed-in admin's real
+// credentials) — it is never compared, logged, or stored anywhere in this app's own code or
+// database, in plain text or otherwise.
+function deleteStaff(tcNo){
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  document.getElementById('staffDeleteAuthTcNo').value = tcNo;
+  document.getElementById('staffDeleteAuthName').textContent = s ? `${s.name} (TC ${s.tcNo})` : 'this staff member';
+  document.getElementById('staffDeleteAuthPassword').value = '';
+  document.getElementById('staffDeleteAuthError').style.display = 'none';
+  openModalEl('staffDeleteAuthOverlay');
+}
+function cancelStaffDeleteAuth(){
+  document.getElementById('staffDeleteAuthPassword').value = '';
+  document.getElementById('staffDeleteAuthError').style.display = 'none';
+  closeModal('staffDeleteAuthOverlay');
+}
+async function confirmStaffDeleteWithPassword(){
+  const tcNo = document.getElementById('staffDeleteAuthTcNo').value;
+  const password = document.getElementById('staffDeleteAuthPassword').value;
+  const errBox = document.getElementById('staffDeleteAuthError');
+  const btn = document.getElementById('staffDeleteAuthConfirmBtn');
+  errBox.style.display = 'none';
+  if(!password){ errBox.textContent = 'Please enter your Admin password.'; errBox.style.display = ''; return; }
+
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  try{
+    const cred = firebase.auth.EmailAuthProvider.credential(auth.currentUser.email, password);
+    await auth.currentUser.reauthenticateWithCredential(cred);
+  }catch(err){
+    errBox.textContent = 'Incorrect Admin Password. Staff record was not deleted.';
+    errBox.style.display = '';
+    btn.disabled = false; btn.textContent = 'Delete Permanently';
+    return;
+  }
+
+  try{
+    await db.collection('staff').doc(tcNo).delete();
+    toast('Staff deleted', 'ok');
+    closeModal('staffDeleteAuthOverlay');
+  }catch(err){
+    errBox.textContent = 'Delete failed: ' + err.message;
+    errBox.style.display = '';
+  }
+  btn.disabled = false; btn.textContent = 'Delete Permanently';
 }
 
 function openStaffDetail(tcNo){
