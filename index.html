@@ -999,9 +999,9 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
           <div class="form-row c3">
             <div class="field"><label>Basic Salary</label><input type="number" id="indSalary" value="0" oninput="onIndSalaryChange()"></div>
             <div class="field"><label>Food Allowance <span class="hint">(indemnity calc only)</span></label><input type="number" id="indFood" value="500"></div>
-            <div class="field"><label>House Allowance <span class="hint">(= Basic ÷ 6)</span></label><input type="number" id="indHouse" value="0"></div>
+            <div class="field"><label>House Allowance <span class="hint">(= Basic ÷ 4)</span></label><input type="number" id="indHouse" value="0"></div>
           </div>
-          <div class="hint" style="margin:-8px 0 10px;">Food (500 SAR) and House (Basic Salary ÷ 6) are auto-filled per your usual indemnity policy — used only for this End-of-Service calculation. They do NOT change the staff member's actual salary record or affect any other calculation elsewhere in the app (Estimated Leave Pay, Dashboard, etc.). Edit either field here if this specific case needs a different amount.</div>
+          <div class="hint" style="margin:-8px 0 10px;">Food (500 SAR) and House (Basic Salary ÷ 4) are auto-filled per your usual indemnity policy — used only for this End-of-Service calculation. They do NOT change the staff member's actual salary record or affect any other calculation elsewhere in the app (Estimated Leave Pay, Dashboard, etc.). Edit either field here if this specific case needs a different amount.</div>
           <div class="field"><label>Unpaid Leave Days (deduct)</label><input type="number" id="indUnpaid" value="0"></div>
           <div class="field"><label>Termination Type</label>
             <select id="indType">
@@ -3670,20 +3670,20 @@ function fillIndemnityFromStaff(){
   document.getElementById('indCurrent').value = todayISO();
   document.getElementById('indSalary').value = s.salary;
   // Food/House allowance for indemnity purposes follow the company's standard indemnity
-  // policy (Food = flat 500 SAR, House = Basic Salary ÷ 6) — NOT the staff member's actual
+  // policy (Food = flat 500 SAR, House = Basic Salary ÷ 4) — NOT the staff member's actual
   // stored food/house allowance fields (which are for payroll/leave-pay purposes and are
   // often 0 since many staff don't draw a separate monthly food/house allowance at all).
   document.getElementById('indFood').value = 500;
-  document.getElementById('indHouse').value = (Number(s.salary)||0)/6;
+  document.getElementById('indHouse').value = (Number(s.salary)||0)/4;
   const unpaid = leaveList.filter(l=>l.tcNo===tcNo && l.type==='Unpaid Leave').reduce((a,l)=>a+(Number(l.days)||0),0);
   document.getElementById('indUnpaid').value = unpaid;
 }
-// Keeps House Allowance in sync (Basic Salary ÷ 6) whenever Basic Salary is edited by hand —
+// Keeps House Allowance in sync (Basic Salary ÷ 4) whenever Basic Salary is edited by hand —
 // so the indemnity-only allowance formula stays consistent even for a manually-typed salary,
 // not just when auto-filled from a staff record.
 function onIndSalaryChange(){
   const salary = Number(document.getElementById('indSalary').value)||0;
-  document.getElementById('indHouse').value = Math.round((salary/6)*100)/100;
+  document.getElementById('indHouse').value = Math.round((salary/4)*100)/100;
 }
 
 function cancelIndemnity(){
