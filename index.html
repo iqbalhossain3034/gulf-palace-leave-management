@@ -1002,7 +1002,20 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
             <div class="field"><label>House Allowance <span class="hint">(= Basic ÷ 4)</span></label><input type="number" id="indHouse" value="0"></div>
           </div>
           <div class="hint" style="margin:-8px 0 10px;">Food (500 SAR) and House (Basic Salary ÷ 4) are auto-filled per your usual indemnity policy — used only for this End-of-Service calculation. They do NOT change the staff member's actual salary record or affect any other calculation elsewhere in the app (Estimated Leave Pay, Dashboard, etc.). Edit either field here if this specific case needs a different amount.</div>
-          <div class="field"><label>Unpaid Leave Days (deduct)</label><input type="number" id="indUnpaid" value="0"></div>
+          <div class="field">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+              <input type="checkbox" id="indUnpaidDeductOn" style="width:16px; height:16px;"> Deduct Unpaid Leave Days from Indemnity
+            </label>
+            <input type="number" id="indUnpaid" value="0" placeholder="Unpaid leave days" style="margin-top:6px;">
+            <div class="hint" style="margin-top:4px;">Off by default — tick this only if your company's settlement actually deducts unpaid leave from the indemnity amount for this case.</div>
+          </div>
+          <div class="field">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+              <input type="checkbox" id="indLeaveEncashOn" style="width:16px; height:16px;"> Include Annual Leave Encashment in Total
+            </label>
+            <input type="number" id="indLeaveDays" value="0" placeholder="Annual Leave balance (days)" style="margin-top:6px;">
+            <div class="hint" style="margin-top:4px;">Auto-filled from the staff member's current Annual Leave balance when selected above. Tick the box to add this as a cash payout on top of the Indemnity — leave it unticked to calculate Service Money (Indemnity) only.</div>
+          </div>
           <div class="field"><label>Termination Type</label>
             <select id="indType">
               <option value="full">Resigned after 10+ years / Terminated by employer (100%)</option>
@@ -1736,8 +1749,11 @@ function leaveBalance(staff){
   return { accrued, taken, balance: accrued - taken };
 }
 
-function tenureYearsMonthsDays(joiningDate){
-  const start = new Date(joiningDate), end = new Date();
+// Breaks a span into years/months/days. Defaults to "until today", but accepts an explicit
+// end date (used by the Indemnity Calculator, where service is measured to the leaving date
+// rather than today).
+function tenureYearsMonthsDays(joiningDate, endDate){
+  const start = new Date(joiningDate), end = endDate ? new Date(endDate) : new Date();
   let y = end.getFullYear()-start.getFullYear();
   let m = end.getMonth()-start.getMonth();
   let d = end.getDate()-start.getDate();
@@ -3677,6 +3693,12 @@ function fillIndemnityFromStaff(){
   document.getElementById('indHouse').value = (Number(s.salary)||0)/4;
   const unpaid = leaveList.filter(l=>l.tcNo===tcNo && l.type==='Unpaid Leave').reduce((a,l)=>a+(Number(l.days)||0),0);
   document.getElementById('indUnpaid').value = unpaid;
+  document.getElementById('indUnpaidDeductOn').checked = false;
+  // Auto-fill the staff member's current Annual Leave balance (days still owed to them) —
+  // the checkbox next to it controls whether this gets added to the total as a cash payout.
+  const balance = leaveBalance(s).balance;
+  document.getElementById('indLeaveDays').value = Math.max(0, balance).toFixed(1);
+  document.getElementById('indLeaveEncashOn').checked = false;
 }
 // Keeps House Allowance in sync (Basic Salary ÷ 4) whenever Basic Salary is edited by hand —
 // so the indemnity-only allowance formula stays consistent even for a manually-typed salary,
@@ -3706,6 +3728,9 @@ function calcIndemnity(){
   const food = Number(document.getElementById('indFood').value)||0;
   const house = Number(document.getElementById('indHouse').value)||0;
   const unpaidDays = Number(document.getElementById('indUnpaid').value)||0;
+  const deductUnpaid = document.getElementById('indUnpaidDeductOn').checked;
+  const leaveDays = Number(document.getElementById('indLeaveDays').value)||0;
+  const includeLeaveEncash = document.getElementById('indLeaveEncashOn').checked;
   const type = document.getElementById('indType').value;
   const totalMonthly = salary+food+house;
   const dailyRate = totalMonthly/30;
@@ -3724,18 +3749,27 @@ function calcIndemnity(){
   else if(type==='one_third') factor = 1/3;
   indemnity = indemnity*factor;
 
-  const unpaidDeduction = unpaidDays*dailyRate;
-  const grandTotal = Math.max(0, indemnity-unpaidDeduction);
+  // Both of these are optional and off by default — many settlements pay the indemnity
+  // straight out with no unpaid-leave deduction, and leave encashment is often handled as a
+  // separate payment rather than folded into the indemnity figure.
+  const unpaidDeduction = deductUnpaid ? unpaidDays*dailyRate : 0;
+  const leaveEncashment = includeLeaveEncash ? leaveDays*dailyRate : 0;
+  const grandTotal = Math.max(0, indemnity - unpaidDeduction + leaveEncashment);
+
+  // Years/months/days breakdown purely for readability — the money above is still calculated
+  // strictly from the raw day count, so this display can never change any actual figure.
+  const t = tenureYearsMonthsDays(joining, current);
 
   document.getElementById('indemnityResult').innerHTML = `
-    <div class="k-v"><span>Total Service</span><span>${years.toFixed(2)} years (${totalDays} days)</span></div>
+    <div class="k-v"><span>Total Service</span><span>${t.y}y ${t.m}m ${t.d}d (${totalDays} days)</span></div>
     <div class="k-v"><span>Total Monthly Package</span><span>${totalMonthly.toFixed(2)} SAR</span></div>
     <div class="k-v"><span>Indemnity (before factor)</span><span>${(indemnityMonths*totalMonthly).toFixed(2)} SAR</span></div>
     <div class="k-v"><span>Applied Factor</span><span>${(factor*100).toFixed(0)}%</span></div>
     <div class="k-v"><span>Indemnity (after factor)</span><span>${indemnity.toFixed(2)} SAR</span></div>
-    <div class="k-v"><span>Unpaid Leave Deduction (${unpaidDays} days)</span><span style="color:var(--danger);">− ${unpaidDeduction.toFixed(2)} SAR</span></div>
+    ${deductUnpaid ? `<div class="k-v"><span>Unpaid Leave Deduction (${unpaidDays} days)</span><span style="color:var(--danger);">− ${unpaidDeduction.toFixed(2)} SAR</span></div>` : ''}
+    ${includeLeaveEncash ? `<div class="k-v"><span>Annual Leave Encashment (${leaveDays} days)</span><span style="color:var(--success);">+ ${leaveEncashment.toFixed(2)} SAR</span></div>` : ''}
     <div class="k-v" style="border-bottom:none; margin-top:8px; padding-top:14px; border-top:2px solid var(--gold);">
-      <span style="font-weight:800; color:var(--navy); font-size:15px;">Grand Total Indemnity</span>
+      <span style="font-weight:800; color:var(--navy); font-size:15px;">Grand Total ${includeLeaveEncash ? 'Payout' : 'Indemnity'}</span>
       <span style="font-weight:800; color:var(--navy); font-size:18px;">${grandTotal.toFixed(2)} SAR</span>
     </div>
   `;
