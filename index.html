@@ -994,7 +994,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
           </div>
           <div class="form-row">
             <div class="field"><label>Joining Date</label><input type="date" id="indJoining"></div>
-            <div class="field"><label>Current / Leaving Date</label><input type="date" id="indCurrent"></div>
+            <div class="field"><label>Current / Leaving Date</label><input type="date" id="indCurrent" onchange="refreshIndemnityLeaveBalance()"></div>
           </div>
           <div class="form-row c3">
             <div class="field"><label>Basic Salary</label><input type="number" id="indSalary" value="0" oninput="onIndSalaryChange()"></div>
@@ -3694,11 +3694,23 @@ function fillIndemnityFromStaff(){
   const unpaid = leaveList.filter(l=>l.tcNo===tcNo && l.type==='Unpaid Leave').reduce((a,l)=>a+(Number(l.days)||0),0);
   document.getElementById('indUnpaid').value = unpaid;
   document.getElementById('indUnpaidDeductOn').checked = false;
-  // Auto-fill the staff member's current Annual Leave balance (days still owed to them) —
-  // the checkbox next to it controls whether this gets added to the total as a cash payout.
-  const balance = leaveBalance(s).balance;
-  document.getElementById('indLeaveDays').value = Math.max(0, balance).toFixed(1);
   document.getElementById('indLeaveEncashOn').checked = false;
+  refreshIndemnityLeaveBalance();
+}
+
+// The Annual Leave balance owed at settlement depends on the LEAVING date, not today — a
+// staff member leaving next month accrues more leave between now and then. Recalculated
+// whenever the staff member or the leaving date changes so the encashment figure is correct.
+function refreshIndemnityLeaveBalance(){
+  const tcNo = document.getElementById('indStaffSelect').value;
+  const leavingDate = document.getElementById('indCurrent').value;
+  if(!tcNo || !leavingDate) return;
+  const s = staffList.find(x=>x.tcNo===tcNo);
+  if(!s) return;
+  const accrued = accruedAnnualLeave(s.joiningDate, leavingDate);
+  const taken = annualLeaveTakenDays(s.tcNo, null, leavingDate);
+  const balance = accrued - taken;
+  document.getElementById('indLeaveDays').value = Math.max(0, balance).toFixed(1);
 }
 // Keeps House Allowance in sync (Basic Salary ÷ 4) whenever Basic Salary is edited by hand —
 // so the indemnity-only allowance formula stays consistent even for a manually-typed salary,
@@ -3733,7 +3745,12 @@ function calcIndemnity(){
   const includeLeaveEncash = document.getElementById('indLeaveEncashOn').checked;
   const type = document.getElementById('indType').value;
   const totalMonthly = salary+food+house;
-  const dailyRate = totalMonthly/30;
+  // Indemnity (Service Money) uses the FULL package (Basic + Food + House). Everything else —
+  // leave encashment and any unpaid-leave deduction — is paid at the BASIC salary rate only,
+  // since Food/House allowances here exist solely for the indemnity formula and are not part
+  // of what a day of leave is actually worth.
+  const indemnityDailyRate = totalMonthly/30;
+  const basicDailyRate = salary/30;
 
   const totalDays = daysBetween(joining, current);
   const years = totalDays/365;
@@ -3752,8 +3769,8 @@ function calcIndemnity(){
   // Both of these are optional and off by default — many settlements pay the indemnity
   // straight out with no unpaid-leave deduction, and leave encashment is often handled as a
   // separate payment rather than folded into the indemnity figure.
-  const unpaidDeduction = deductUnpaid ? unpaidDays*dailyRate : 0;
-  const leaveEncashment = includeLeaveEncash ? leaveDays*dailyRate : 0;
+  const unpaidDeduction = deductUnpaid ? unpaidDays*basicDailyRate : 0;
+  const leaveEncashment = includeLeaveEncash ? leaveDays*basicDailyRate : 0;
   const grandTotal = Math.max(0, indemnity - unpaidDeduction + leaveEncashment);
 
   // Years/months/days breakdown purely for readability — the money above is still calculated
