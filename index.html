@@ -935,7 +935,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
         <div class="section-title">This Year's Applied History</div>
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Type</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th></tr></thead>
+          <thead><tr><th>Type</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th><th>Taken With</th></tr></thead>
           <tbody id="localLeaveHistoryTbody"></tbody>
         </table>
         </div>
@@ -2017,22 +2017,49 @@ function fixedLeaveConvertedOTDays(tcNo, type, year, excludeGroupId){
     .reduce((sum,l)=> sum + (Number(l.days)||0), 0);
 }
 // Entitlement for one specific year (0 if the staff wasn't yet eligible that year).
+// Approximate calendar date a fixed holiday falls on in a given year, used to decide whether
+// a staff member who joined mid-year was actually employed when it occurred. National Day
+// (23 Sept) and Foundation Day (22 Feb) are fixed Gregorian dates. Eid Al Fitr / Eid Al Adha
+// follow the Hijri calendar and move each year, so we look up the real date from any existing
+// leave record of that type and year (created via Saudi Local Leave bulk-apply); if none has
+// been recorded yet, we return null and the entitlement is granted, since we can't prove the
+// holiday fell before they joined.
+function holidayDateForYear(type, year){
+  if(type==='National Day') return `${year}-09-23`;
+  if(type==='Foundation Day') return `${year}-02-22`;
+  const rec = leaveList.find(l=> l.type===type && Number(l.year)===Number(year) && l.fromDate);
+  return rec ? rec.fromDate : null;
+}
+
 function fixedLeaveEntitlementForYear(type, staff, year){
   const rule = FIXED_LEAVE_RULES[type];
   if(!rule) return 0;
   const joinYear = new Date(staff.joiningDate).getFullYear();
   const effectiveStartYear = rule.startYear ? Math.max(rule.startYear, joinYear) : joinYear;
-  return year >= effectiveStartYear ? holidayDaysPerYearFor(type, staff) : 0;
+  if(year < effectiveStartYear) return 0;
+  // Within the joining year itself, a holiday that already passed BEFORE the staff member
+  // joined isn't owed to them — e.g. someone joining 17 Sept 2024 never earned that year's
+  // Foundation Day (22 Feb 2024). Only holidays falling on/after the joining date count.
+  if(Number(year) === joinYear){
+    const holidayDate = holidayDateForYear(type, year);
+    if(holidayDate && holidayDate < staff.joiningDate) return 0;
+  }
+  return holidayDaysPerYearFor(type, staff);
 }
-// Cumulative entitlement across every eligible year up through the current year.
+// Cumulative entitlement across every eligible year up through the current year. Sums the
+// per-year figures rather than multiplying, so the joining-year rule above (a holiday that
+// fell before the staff member joined isn't owed) is respected here too.
 function fixedLeaveEntitlementTotal(type, staff){
   const rule = FIXED_LEAVE_RULES[type];
   if(!rule) return 0;
   const joinYear = new Date(staff.joiningDate).getFullYear();
   const effectiveStartYear = rule.startYear ? Math.max(rule.startYear, joinYear) : joinYear;
   const currentYear = new Date().getFullYear();
-  const yearsElapsed = Math.max(0, currentYear - effectiveStartYear + 1);
-  return yearsElapsed * holidayDaysPerYearFor(type, staff);
+  let total = 0;
+  for(let y=effectiveStartYear; y<=currentYear; y++){
+    total += fixedLeaveEntitlementForYear(type, staff, y);
+  }
+  return total;
 }
 
 // Leave Balance: precise daily accrual for Annual Leave; fixed N-days/year entitlement for
@@ -2682,7 +2709,15 @@ function renderStaffGrid(){
   const q = (document.getElementById('staffSearch')?.value||'').toLowerCase();
   const statusF = document.getElementById('staffStatusFilter')?.value||'';
   let list = staffList.filter(s=> (s.name.toLowerCase().includes(q) || s.tcNo.includes(q)) );
-  if(statusF) list = list.filter(s=>s.status===statusF);
+  // Filter against the SAME effective status the card badge shows, not the raw stored field.
+  // A staff member whose stored status is "Active" but who is actually away on an approved
+  // leave right now displays as "On Leave" — so filtering by "On Leave" has to match that,
+  // otherwise the filter appears broken (returns nothing for the people you can see labelled
+  // On Leave on screen).
+  if(statusF) list = list.filter(s=>{
+    const effective = activeLeaveFor(s.tcNo) ? 'On Leave' : s.status;
+    return effective === statusF;
+  });
 
   const grid = document.getElementById('staffGrid');
   if(list.length===0){
@@ -3575,8 +3610,21 @@ function renderLocalLeaveHistory(){
   const types = ['Eid Al Fitr Leave','Eid Al Adha Leave','National Day','Foundation Day'];
   const rows = leaveList.filter(l=> types.includes(l.type) && l.year===year).sort((a,b)=>a.type.localeCompare(b.type));
   const tbody = document.getElementById('localLeaveHistoryTbody');
-  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet for this year</td></tr>'; return; }
-  tbody.innerHTML = rows.map(l=>`<tr><td>${l.type}</td><td>${l.tcNo}</td><td>${l.name}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td></tr>`).join('');
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet for this year</td></tr>'; return; }
+  tbody.innerHTML = rows.map(l=>{
+    // Was this local leave part of a bigger Annual Leave trip (i.e. the same submitted
+    // request also contains an Annual Leave entry), or was it taken on its own locally?
+    // Knowing this at a glance tells you whether the person actually travelled or simply
+    // took the holiday here.
+    const groupId = l.groupId || l.id;
+    const sameRequest = leaveList.filter(x=> (x.groupId||x.id) === groupId);
+    const withAnnual = sameRequest.some(x=> x.type === 'Annual Leave');
+    let tag;
+    if(l.convertedToOT) tag = '<span class="badge badge-warning">Converted to OT</span>';
+    else if(withAnnual) tag = '<span class="badge badge-info">With Annual Leave</span>';
+    else tag = '<span class="badge badge-success">Taken Locally</span>';
+    return `<tr><td>${l.type}</td><td>${l.tcNo}</td><td>${l.name}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${tag}</td></tr>`;
+  }).join('');
 }
 
 async function applyLocalLeave(type, fromId, toId){
