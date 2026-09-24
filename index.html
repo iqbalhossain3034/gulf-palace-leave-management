@@ -3097,17 +3097,24 @@ function openStaffDetail(tcNo){
 // admin can check elapsed time against the company's minimum gap policy before the next
 // Annual Leave request (informally ~21 months minimum, company generally wants a full 2
 // years/24 months before allowing the next one).
+// Finds the most recently COMPLETED "Annual Leave" REQUEST (not just the individual Annual
+// Leave leave-type entry) — an Annual Leave category request commonly bundles in Local leave
+// types taken back-to-back (Eid Al Adha, National Day, Unpaid Leave, etc., all part of the
+// same trip). The whole group's LATEST end date is what matters for "when did they actually
+// return to work" — using just the Annual Leave entry's own end date was wrong whenever the
+// trip continued afterward with other leave types under the same request, since the staff
+// member hadn't actually returned yet on that earlier date.
 function lastAnnualLeaveReturn(tcNo){
   const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
   const today = todayISO();
-  const completed = leaveList
-    .filter(l=> l.tcNo===tcNo && l.type==='Annual Leave' && APPROVED_STATUSES.includes(l.status) && l.toDate < today)
-    .sort((a,b)=> new Date(b.toDate) - new Date(a.toDate));
-  if(completed.length===0) return null;
-  const last = completed[0];
-  const returnDate = new Date(last.toDate);
-  returnDate.setDate(returnDate.getDate()+1); // the day after the leave's last day is the return-to-work day
-  return { returnDateIso: returnDate.toISOString().slice(0,10), leaveToDate: last.toDate };
+  const groups = computeLeaveGroups(leaveList.filter(l=> l.tcNo===tcNo && APPROVED_STATUSES.includes(l.status)))
+    .filter(g=> g.category==='Annual Leave' && g.maxEnd < today)
+    .sort((a,b)=> new Date(b.maxEnd) - new Date(a.maxEnd));
+  if(groups.length===0) return null;
+  const last = groups[0];
+  const returnDate = new Date(last.maxEnd);
+  returnDate.setDate(returnDate.getDate()+1); // the day after the request's last day is the return-to-work day
+  return { returnDateIso: returnDate.toISOString().slice(0,10), leaveToDate: last.maxEnd };
 }
 
 function renderContracts(){
@@ -3125,8 +3132,17 @@ function renderContracts(){
     else statusHtml = '<span class="badge badge-success">Active</span>';
 
     const lastReturn = lastAnnualLeaveReturn(s.tcNo);
+    // If there's an Annual Leave category request covering TODAY, show that plainly instead
+    // of silently falling back to an older completed one (or "no completed leave yet") —
+    // otherwise it looks like eligibility data when the person is, in fact, away right now.
+    const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
+    const todayStr = todayISO();
+    const ongoingGroup = computeLeaveGroups(leaveList.filter(l=> l.tcNo===s.tcNo && APPROVED_STATUSES.includes(l.status)))
+      .find(g=> g.category==='Annual Leave' && g.minStart<=todayStr && g.maxEnd>=todayStr);
     let sinceReturnHtml;
-    if(!lastReturn){
+    if(ongoingGroup){
+      sinceReturnHtml = `<span class="badge badge-warning">On Leave</span><div style="font-size:11px; color:var(--slate); margin-top:3px; white-space:nowrap;">Returns ${fmtDDMMYYYY(new Date(ongoingGroup.maxEnd))}</div>`;
+    } else if(!lastReturn){
       sinceReturnHtml = '<span style="color:var(--slate); font-size:12px;">No completed Annual Leave yet</span>';
     } else {
       const since = tenureYearsMonthsDays(lastReturn.returnDateIso);
