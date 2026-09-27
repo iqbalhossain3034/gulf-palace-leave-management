@@ -1064,6 +1064,17 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
           <button class="btn btn-primary" onclick="saveConfig()">Save</button>
         </div>
         <div class="card card-pad">
+          <div class="section-title">WhatsApp Notifications (CallMeBot)</div>
+          <div class="sub" style="margin-bottom:12px;">When a staff member submits a leave request for approval, a WhatsApp message with the TC No, name and leave details is sent automatically to this number so it can be approved quickly. Uses the free <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">CallMeBot WhatsApp API</a> — add the CallMeBot number on WhatsApp and send it the activation message shown on their site to get your API key.</div>
+          <div class="form-row">
+            <div class="field"><label>Approver WhatsApp Number (with country code)</label><input type="text" id="cfgWhatsappPhone" placeholder="e.g. 9665XXXXXXXX"></div>
+            <div class="field"><label>CallMeBot API Key</label><input type="text" id="cfgWhatsappApiKey" placeholder="e.g. 123456"></div>
+          </div>
+          <div class="field"><label>App URL (optional, added to the message)</label><input type="text" id="cfgWhatsappAppUrl" placeholder="https://your-app-link"></div>
+          <button class="btn btn-outline" onclick="sendTestWhatsapp()" style="margin-right:8px;">Send Test Message</button>
+          <button class="btn btn-primary" onclick="saveConfig()">Save</button>
+        </div>
+        <div class="card card-pad">
           <div class="section-title">Account</div>
           <div class="k-v"><span>Signed in as</span><span id="cfgUserEmail">—</span></div>
           <div class="k-v"><span>Firebase Project</span><span id="cfgProjectId">—</span></div>
@@ -1337,7 +1348,12 @@ let CFG = {
   // Admin-configurable holiday entitlements (Settings → Leave Policy) — Saudi vs Non-Saudi
   // staff, editable any time without touching code. Read via holidayDaysPerYearFor() below.
   nationalDaySaudiDays: 2, nationalDayNonSaudiDays: 1,
-  foundationDaySaudiDays: 2, foundationDayNonSaudiDays: 1
+  foundationDaySaudiDays: 2, foundationDayNonSaudiDays: 1,
+  // WhatsApp approval notifications via CallMeBot (Settings → WhatsApp Notifications).
+  // whatsappPhone must include the country code (e.g. 9665XXXXXXXX), whatsappApiKey is the
+  // key CallMeBot issued after the approver added the bot on WhatsApp, whatsappAppUrl is an
+  // optional link appended to the message so the approver can tap straight into the app.
+  whatsappPhone: '', whatsappApiKey: '', whatsappAppUrl: ''
 };
 
 const LEAVE_CATEGORIES = ["Emergency", "Local", "Annual Leave"];
@@ -1604,6 +1620,9 @@ function initListeners(){
     document.getElementById('cfgNationalDayNonSaudi').value = CFG.nationalDayNonSaudiDays;
     document.getElementById('cfgFoundationDaySaudi').value = CFG.foundationDaySaudiDays;
     document.getElementById('cfgFoundationDayNonSaudi').value = CFG.foundationDayNonSaudiDays;
+    document.getElementById('cfgWhatsappPhone').value = CFG.whatsappPhone||'';
+    document.getElementById('cfgWhatsappApiKey').value = CFG.whatsappApiKey||'';
+    document.getElementById('cfgWhatsappAppUrl').value = CFG.whatsappAppUrl||'';
     refreshAll();
   });
 
@@ -2641,6 +2660,7 @@ async function submitLeaveRequest(){
       });
       await batch.commit();
       toast(isAdmin ? 'Leave request saved' : 'Your leave request has been submitted for approval', 'ok');
+      if(!isAdmin) notifyApproverOfLeaveRequest(tcNo, s.name, category, entries);
     }
     showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
   }catch(err){ toast('Failed to save: '+err.message, 'err'); }
@@ -3962,10 +3982,39 @@ async function saveConfig(){
     nationalDaySaudiDays: Number(document.getElementById('cfgNationalDaySaudi').value)||0,
     nationalDayNonSaudiDays: Number(document.getElementById('cfgNationalDayNonSaudi').value)||0,
     foundationDaySaudiDays: Number(document.getElementById('cfgFoundationDaySaudi').value)||0,
-    foundationDayNonSaudiDays: Number(document.getElementById('cfgFoundationDayNonSaudi').value)||0
+    foundationDayNonSaudiDays: Number(document.getElementById('cfgFoundationDayNonSaudi').value)||0,
+    whatsappPhone: document.getElementById('cfgWhatsappPhone').value.trim(),
+    whatsappApiKey: document.getElementById('cfgWhatsappApiKey').value.trim(),
+    whatsappAppUrl: document.getElementById('cfgWhatsappAppUrl').value.trim()
   };
   try{ await db.collection('settings').doc('appConfig').set(data,{merge:true}); toast('Settings saved','ok'); }
   catch(err){ toast('Failed: '+err.message,'err'); }
+}
+
+// ---- WhatsApp approval notifications via CallMeBot -------------------------------------
+// Fire-and-forget by design: a failed/slow WhatsApp notification must never block or delay
+// the actual leave-request save. mode:'no-cors' is used because CallMeBot's endpoint does not
+// return CORS headers — the browser would otherwise throw even though the request itself
+// (and the WhatsApp message) still goes through fine; we simply can't read the response back.
+function callMeBotSendWhatsApp(message){
+  if(!CFG.whatsappPhone || !CFG.whatsappApiKey) return; // not configured — skip silently
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(CFG.whatsappPhone)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(CFG.whatsappApiKey)}`;
+  fetch(url, { mode:'no-cors' }).catch(()=>{});
+}
+
+function notifyApproverOfLeaveRequest(tcNo, name, category, entries){
+  const details = entries.map(e=> `• ${e.type}: ${fmtDate(e.fromDate)} → ${fmtDate(e.toDate)} (${e.days}d)`).join('\n');
+  const msg = `🔔 New Leave Request — Approval Needed\n\nTC No: ${tcNo}\nName: ${name}\nCategory: ${category}\n${details}\n\nPlease open the Leave Management app to approve or reject.`
+    + (CFG.whatsappAppUrl ? `\n${CFG.whatsappAppUrl}` : '');
+  callMeBotSendWhatsApp(msg);
+}
+
+function sendTestWhatsapp(){
+  const phone = document.getElementById('cfgWhatsappPhone').value.trim();
+  const apiKey = document.getElementById('cfgWhatsappApiKey').value.trim();
+  if(!phone || !apiKey){ toast('Enter the phone number and API key first, then Save, before testing', 'err'); return; }
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent('✅ Test message from the Leave Management System')}&apikey=${encodeURIComponent(apiKey)}`;
+  fetch(url, { mode:'no-cors' }).then(()=> toast('Test message sent — check WhatsApp', 'ok')).catch(()=> toast('Could not reach CallMeBot — check your connection', 'err'));
 }
 
 /* =========================================================================
