@@ -1600,6 +1600,7 @@ function initListeners(){
     if(staffList.length===0){ seedInitialStaff(); }
     resolveCurrentUser();
     refreshAll();
+    checkPassportExpiryAlerts();
   }, err=> toast('Failed to load staff: '+err.message, 'err'));
 
   unsubLeave = db.collection('leaves').orderBy('fromDate','desc').onSnapshot(snap=>{
@@ -1624,6 +1625,7 @@ function initListeners(){
     document.getElementById('cfgWhatsappApiKey').value = CFG.whatsappApiKey||'';
     document.getElementById('cfgWhatsappAppUrl').value = CFG.whatsappAppUrl||'';
     refreshAll();
+    checkPassportExpiryAlerts();
   });
 
   unsubLeaveTypes = db.collection('leaveTypes').orderBy('order').onSnapshot(snap=>{
@@ -1732,6 +1734,14 @@ function toast(msg, type){
    ========================================================================= */
 function daysBetween(a,b){ return Math.round((new Date(b) - new Date(a)) / MS_DAY); }
 function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+// Adds (or subtracts, for negative months) whole months to an ISO 'YYYY-MM-DD' date string and
+// returns the result as another ISO date string. Used for the 6-month passport validity rule
+// and the 7-month-remaining expiry alert — both just shift a date by a fixed number of months.
+function addMonthsIso(isoDate, months){
+  const d = new Date(isoDate+'T00:00:00');
+  d.setMonth(d.getMonth()+months);
+  return d.toISOString().slice(0,10);
+}
 // Local calendar date (not UTC) — toISOString() alone can be off by a day for users in
 // timezones ahead of UTC (e.g. Saudi Arabia, UTC+3) during the first few hours of the day,
 // which would make leave status calculations (Reserved/On Leave/Returned) flip a day early.
@@ -2572,6 +2582,23 @@ async function submitLeaveRequest(){
     const convertedToOT = category==='Local' && isOTConvertibleType(type) && otCell && otCell.style.display!=='none' && row.querySelector('.mr-ot').checked;
     if(!type || !year || !start || !days || days<=0){ toast('Please fill Leave Type, Year, Start Date and Days for every entry', 'err'); return; }
     entries.push({ docId, type, year, fromDate: start, toDate: endIso, days, remark, convertedToOT });
+  }
+
+  // Annual Leave passport-validity check: passport must remain valid for at least 6 months
+  // past the LATEST leave end date in this request. Blocks submission with a popup until fixed.
+  if(category==='Annual Leave'){
+    const latestEndDate = entries.reduce((max,e)=> (!max || e.toDate>max) ? e.toDate : max, null);
+    if(latestEndDate){
+      if(!s.passportExpiry){
+        alert(`⚠️ Passport Validity Warning\n\nNo Passport Expiry Date is on file for ${s.name} (TC ${tcNo}), so Annual Leave cannot be validated.\n\nPlease add the passport expiry date in the Staff Directory before submitting the Annual Leave request.`);
+        return;
+      }
+      const requiredValidUntil = addMonthsIso(latestEndDate, 6);
+      if(s.passportExpiry < requiredValidUntil){
+        alert(`⚠️ Passport Validity Warning\n\nYour passport must remain valid for at least 6 months after the Leave End Date.\n\nPassport Expiry Date: ${fmtDate(s.passportExpiry)}\n\nPlease renew your passport before submitting the Annual Leave request.`);
+        return;
+      }
+    }
   }
 
   // Block saving if any two entries in this SAME request overlap on a date.
@@ -4015,6 +4042,29 @@ function sendTestWhatsapp(){
   if(!phone || !apiKey){ toast('Enter the phone number and API key first, then Save, before testing', 'err'); return; }
   const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent('✅ Test message from the Leave Management System')}&apikey=${encodeURIComponent(apiKey)}`;
   fetch(url, { mode:'no-cors' }).then(()=> toast('Test message sent — check WhatsApp', 'ok')).catch(()=> toast('Could not reach CallMeBot — check your connection', 'err'));
+}
+
+// ---- Passport expiry alert (Admin-only, 7 months remaining) ----------------------------
+// Runs whenever staffList or CFG (WhatsApp settings) refreshes — see initListeners(). Each
+// staff doc carries passportAlertNotifiedExpiry: the passportExpiry value the alert was last
+// sent for. Comparing against the CURRENT passportExpiry means: (a) the alert fires only once
+// per expiry date, so repeatedly opening/using the app never re-sends it, and (b) renewing the
+// passport (which changes passportExpiry) naturally re-arms the alert for the new date without
+// any extra "reset" logic needed.
+async function checkPassportExpiryAlerts(){
+  if(!currentUser || currentUser.role!=='admin') return;       // Admin-only, per requirement
+  if(!CFG.whatsappPhone || !CFG.whatsappApiKey) return;         // WhatsApp not configured yet
+  const todayIso = new Date().toISOString().slice(0,10);
+  for(const s of staffList){
+    if(!s.passportExpiry || s.status!=='Active') continue;
+    const alertFromIso = addMonthsIso(s.passportExpiry, -7);   // date the passport hits 7 months remaining
+    if(todayIso < alertFromIso) continue;                       // not due yet
+    if(s.passportAlertNotifiedExpiry === s.passportExpiry) continue; // already alerted for this exact expiry
+    const msg = `🔔 Passport Expiry Alert\nEmployee: ${s.name}\nEmployee ID: ${s.tcNo}\nDepartment: ${s.department||'—'}\nPassport Expiry Date: ${fmtDate(s.passportExpiry)}\nRemaining Validity: 7 Months\n\nPlease arrange the passport renewal process.`;
+    callMeBotSendWhatsApp(msg);
+    try{ await db.collection('staff').doc(s.tcNo).set({ passportAlertNotifiedExpiry: s.passportExpiry }, {merge:true}); }
+    catch(e){ /* non-critical — worst case the alert repeats on the next refresh */ }
+  }
 }
 
 /* =========================================================================
