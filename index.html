@@ -1810,9 +1810,13 @@ function computeTicketPeriods(staff){
   // of truth — a ticket counts as "Used" as soon as it's approved, not only once the leave
   // is fully closed on return.
   const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
+  // Only "Company Ticket" satisfies a contract-cycle period / clears its "Due" status —
+  // Self Ticket (staff pays their own way) and Employee of the Year (a separate complimentary
+  // award) must never be merged into or counted against the company's ticket obligation, so
+  // they are deliberately excluded here and tracked separately in computeOtherTicketEvents().
   const usageEvents = leaveList
-    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType && l.ticketType!=='None' && APPROVED_STATUSES.includes(l.status))
-    .map(l=> ({ date: l.fromDate, type: l.ticketType, periodStart: l.ticketPeriodStart || null }));
+    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType==='Company Ticket' && APPROVED_STATUSES.includes(l.status))
+    .map(l=> ({ date: l.fromDate, type: l.ticketType, periodStart: l.ticketPeriodStart || null, groupId: l.groupId||l.id }));
   const periods = [];
   let periodStart = new Date(staff.joiningDate);
   let guard = 0;
@@ -1837,7 +1841,7 @@ function computeTicketPeriods(staff){
     periods.push({
       start: periodStartIso,
       end: periodEnd.toISOString().slice(0,10),
-      status, usedDate: match?match.date:null, ticketType: match?match.type:null
+      status, usedDate: match?match.date:null, ticketType: match?match.type:null, groupId: match?match.groupId:null
     });
     if(periodEnd >= today) break; // this is the current, still-open period — stop here
     periodStart = periodEnd;
@@ -1845,20 +1849,32 @@ function computeTicketPeriods(staff){
   return periods;
 }
 
-// NOTE: "Employee of the Year" ticket usage is now tracked the same way as Self/Company
-// tickets — via ticketType on an Annual Leave request, matched against a contract-cycle
-// period in computeTicketPeriods() above. There is deliberately no separate bonus-ticket
-// mechanism anymore; the cycle periods above are the single source of truth for what's due.
+// Self Ticket and Employee of the Year usage, listed purely as history — deliberately kept
+// out of computeTicketPeriods() above so they can never reduce or satisfy a Company Ticket
+// "Due" period. Sorted most-recent-first.
+function computeOtherTicketEvents(staff){
+  const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
+  return leaveList
+    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && (l.ticketType==='Self Ticket' || l.ticketType==='Employee of the Year') && APPROVED_STATUSES.includes(l.status))
+    .map(l=> ({ date: l.fromDate, type: l.ticketType, groupId: l.groupId||l.id }))
+    .sort((a,b)=> new Date(b.date)-new Date(a.date));
+}
+
+// NOTE: Self Ticket and Employee of the Year are tracked separately from Company Ticket —
+// see computeOtherTicketEvents() above. Only Company Ticket usage can satisfy/clear a
+// contract-cycle period in computeTicketPeriods(); the other two are history-only and never
+// affect what's "Due".
 
 function ticketInfo(staff){
   const periods = computeTicketPeriods(staff);
+  const otherTickets = computeOtherTicketEvents(staff);
   const cycleDue = periods.filter(p=>p.status==='Due').length;
   const totalDue = cycleDue;
   const current = periods[periods.length-1];
   const daysLeft = current ? daysBetween(todayISO(), current.end) : 0;
   return {
     cycleYears: ticketCycleYearsForStaff(staff),
-    periods, cycleDue, totalDue,
+    periods, otherTickets, cycleDue, totalDue,
     base: current ? current.start : staff.joiningDate,
     nextDue: current ? current.end : staff.joiningDate,
     daysLeft, due: totalDue>0
@@ -3013,6 +3029,7 @@ function openStaffDetail(tcNo){
   if(!s) return;
   const b = leaveBalance(s);
   const ti = ticketInfo(s);
+  const serialMap = computeGroupSerialMap();
   const tenure = tenureYearsMonthsDays(s.joiningDate);
   const hist = leaveList.filter(l=>l.tcNo===tcNo).sort((a,b)=> new Date(b.fromDate)-new Date(a.fromDate));
   const initials = s.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -3128,8 +3145,17 @@ function openStaffDetail(tcNo){
     <div class="section-title">Air Ticket History</div>
     <div class="k-v" style="font-weight:800;"><span>Total Tickets Due (from ${ti.cycleYears}-year contract periods below)</span><span>${ti.totalDue}</span></div>
     <div class="tbl-wrap" style="margin:10px 0 18px;">
-    <table><thead><tr><th>Period</th><th>Status</th><th>Used Date</th><th>Ticket Type</th></tr></thead>
-    <tbody>${ti.periods.map(p=>`<tr><td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(p.start))} → ${fmtDDMMYYYY(new Date(p.end))}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
+    <table><thead><tr><th>Period</th><th>S/N</th><th>Status</th><th>Used Date</th><th>Ticket Type</th></tr></thead>
+    <tbody>${ti.periods.map(p=>`<tr><td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(p.start))} → ${fmtDDMMYYYY(new Date(p.end))}</td><td>${p.groupId?('#'+(serialMap[p.groupId]||'?')):'—'}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
+    </table>
+    </div>
+    <div class="note-box" style="margin-bottom:10px;">A period above only counts as "Used" when a record is <b>Annual Leave</b>, approved, and Ticket Type is specifically <b>Company Ticket</b>. Self Ticket and Employee of the Year never satisfy or count against this — see below.</div>
+
+    <div class="section-title">Self Ticket &amp; Employee of the Year History</div>
+    <div class="note-box" style="margin-bottom:10px;">Listed here for reference only — these are never merged into or counted as Company Ticket usage above, and never reduce the Total Tickets Due.</div>
+    <div class="tbl-wrap" style="margin:10px 0 18px;">
+    <table><thead><tr><th>S/N</th><th>Date</th><th>Ticket Type</th></tr></thead>
+    <tbody>${ti.otherTickets.length? ti.otherTickets.map(o=>`<tr><td>#${serialMap[o.groupId]||'?'}</td><td>${fmtDate(o.date)}</td><td><span class="badge badge-info">${o.type}</span></td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center; color:var(--slate);">No records</td></tr>'}</tbody>
     </table>
     </div>
 
