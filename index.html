@@ -3299,16 +3299,35 @@ function computeGroupSerialMap(){
 // both ticket-history tables in openStaffDetail() below.
 function computeAnnualLeaveSerialForStaff(staff){
   const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
-  const groups = {};
+  // Step 1: group by groupId as before (one live-app leave REQUEST = one groupId, however
+  // many rows it produced).
+  const byGroup = {};
   leaveList
     .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && APPROVED_STATUSES.includes(l.status))
     .forEach(l=>{
       const gid = l.groupId||l.id;
-      if(!groups[gid] || l.fromDate < groups[gid]) groups[gid] = l.fromDate;
+      if(!byGroup[gid]) byGroup[gid] = { start: l.fromDate, end: l.toDate, groupIds: [gid] };
+      else { if(l.fromDate<byGroup[gid].start) byGroup[gid].start=l.fromDate; if(l.toDate>byGroup[gid].end) byGroup[gid].end=l.toDate; }
     });
-  const sortedGroupIds = Object.keys(groups).sort((a,b)=> new Date(groups[a]) - new Date(groups[b]));
+  // Step 2: merge blocks that are back-to-back or overlapping (gap of 2 days or less). This
+  // is what makes the count robust to Bulk Import specifically — a single real historical
+  // vacation that was entered as separate rows (e.g. split across a calendar-year boundary)
+  // without filling in a shared groupId would otherwise be double/triple-counted as several
+  // vacations. Real, separate vacations are essentially never only a day or two apart, so
+  // this merge rule doesn't collapse genuinely distinct trips.
+  const blocks = Object.values(byGroup).sort((a,b)=> new Date(a.start)-new Date(b.start));
+  const merged = [];
+  blocks.forEach(b=>{
+    const last = merged[merged.length-1];
+    if(last && (new Date(b.start)-new Date(last.end))/86400000 <= 2){
+      if(new Date(b.end) > new Date(last.end)) last.end = b.end;
+      last.groupIds.push(...b.groupIds);
+    } else {
+      merged.push({ start:b.start, end:b.end, groupIds:[...b.groupIds] });
+    }
+  });
   const map = {};
-  sortedGroupIds.forEach((gid,i)=> map[gid] = i+1);
+  merged.forEach((blk,i)=> blk.groupIds.forEach(gid=> map[gid]=i+1));
   return map;
 }
 
