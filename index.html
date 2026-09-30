@@ -1925,9 +1925,18 @@ function renderDashboard(){
     }).join('');
   }
 
-  // recent activity
+  // recent activity — one row PER STAFF (their single most recent leave record), so every
+  // staff member shows up here. Previously this just took the 8 most-recently-requested leave
+  // ROWS overall; a staff member with several rows submitted in the same request (each sharing
+  // the same requestedAt) could fill most or all of those 8 slots, crowding other staff out
+  // even though they also had recent leave.
   const actBox = document.getElementById('dashRecentActivity');
-  const recent = [...leaveList].sort((a,b)=> (b.requestedAt?.seconds||0) - (a.requestedAt?.seconds||0)).slice(0,8);
+  const latestPerStaff = {};
+  leaveList.forEach(l=>{
+    const ts = l.requestedAt?.seconds||0;
+    if(!latestPerStaff[l.tcNo] || ts > (latestPerStaff[l.tcNo].requestedAt?.seconds||0)) latestPerStaff[l.tcNo] = l;
+  });
+  const recent = Object.values(latestPerStaff).sort((a,b)=> (b.requestedAt?.seconds||0) - (a.requestedAt?.seconds||0)).slice(0,10);
   if(recent.length===0){
     actBox.innerHTML = '<div class="empty"><b>No activity yet</b>Create a new leave entry</div>';
   } else {
