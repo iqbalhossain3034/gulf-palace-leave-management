@@ -3149,7 +3149,7 @@ function openStaffDetail(tcNo){
     <tbody>${ti.periods.map(p=>`<tr><td style="white-space:nowrap;">${fmtDDMMYYYY(new Date(p.start))} → ${fmtDDMMYYYY(new Date(p.end))}</td><td>${p.groupId&&vacationSerialMap[p.groupId]?ordinalSuffix(vacationSerialMap[p.groupId]):'—'}</td><td>${p.status==='Due'?'<span class="badge badge-danger">Due</span>':p.status==='Used'?'<span class="badge badge-success">Used</span>':'<span class="badge badge-neutral">Not Yet Due</span>'}</td><td>${p.usedDate?fmtDate(p.usedDate):'—'}</td><td>${p.ticketType||'—'}</td></tr>`).join('')}</tbody>
     </table>
     </div>
-    <div class="note-box" style="margin-bottom:10px;">A period above only counts as "Used" when a record is <b>Annual Leave</b>, approved, and Ticket Type is specifically <b>Company Ticket</b>. Self Ticket and Employee of the Year never satisfy or count against this — see below. "Vacation No." counts every Annual Leave this staff member has taken, in order — not just ticketed ones.</div>
+    <div class="note-box" style="margin-bottom:10px;">A period above only counts as "Used" when a record is <b>Annual Leave</b>, approved, and Ticket Type is specifically <b>Company Ticket</b>. Self Ticket and Employee of the Year never satisfy or count against this — see below. "Vacation No." counts only this staff member's own Annual Leave requests that used a ticket (Self, Company, or Employee of the Year), in order — an Annual Leave with no ticket isn't numbered.</div>
 
     <div class="section-title">Self Ticket &amp; Employee of the Year History</div>
     <div class="note-box" style="margin-bottom:10px;">Listed here for reference only — these are never merged into or counted as Company Ticket usage above, and never reduce the Total Tickets Due.</div>
@@ -3292,18 +3292,21 @@ function computeGroupSerialMap(){
   return serialMap;
 }
 
-// Numbers this staff member's Annual Leave requests in chronological order — 1st vacation,
-// 2nd vacation, 3rd vacation, etc. — counting EVERY Annual Leave taken (Self Ticket, Company
-// Ticket, Employee of the Year, or no ticket at all), so the number reflects "which vacation
-// this was" for that person, not a ticket-specific or app-wide count. Used to label rows in
-// both ticket-history tables in openStaffDetail() below.
+// Numbers this staff member's TICKETED Annual Leave requests in chronological order — 1st
+// vacation, 2nd vacation, 3rd vacation, etc. — counting any Annual Leave where a ticket was
+// used (Self Ticket, Company Ticket, or Employee of the Year; an Annual Leave with no ticket
+// at all is not numbered). This is scoped to one staff member at a time (computed fresh per
+// staff, filtered by tcNo), so every staff member has their own independent 1st/2nd/3rd
+// sequence. Used to label rows in both ticket-history tables in openStaffDetail() below.
 function computeAnnualLeaveSerialForStaff(staff){
   const APPROVED_STATUSES = ['Reserved', 'On Leave', 'Closed'];
-  // Step 1: group by groupId as before (one live-app leave REQUEST = one groupId, however
-  // many rows it produced).
+  // Only Annual Leave records where a ticket was actually used (Company, Self, or Employee
+  // of the Year — any type counts) get a Vacation No. An Annual Leave taken with no ticket
+  // at all is not numbered, so this lines up exactly with the rows shown in the two ticket
+  // history tables below (no more "gaps" for untracked, non-ticketed leaves).
   const byGroup = {};
   leaveList
-    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && APPROVED_STATUSES.includes(l.status))
+    .filter(l=> l.tcNo===staff.tcNo && l.type==='Annual Leave' && l.ticketType && l.ticketType!=='None' && APPROVED_STATUSES.includes(l.status))
     .forEach(l=>{
       const gid = l.groupId||l.id;
       if(!byGroup[gid]) byGroup[gid] = { start: l.fromDate, end: l.toDate, groupIds: [gid] };
