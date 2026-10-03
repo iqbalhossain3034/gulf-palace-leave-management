@@ -1064,6 +1064,19 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
           <button class="btn btn-primary" onclick="saveConfig()">Save</button>
         </div>
         <div class="card card-pad">
+          <div class="section-title">Eid Date Override (for a new year)</div>
+          <div class="sub" style="margin-bottom:12px;">Only needed for a year not already covered automatically (currently 2010–2026). As soon as you know or calculate the upcoming Eid Al Fitr / Eid Al Adha date, set it here — this lets a new staff member's joining-date cutoff work correctly even before anyone has taken that year's Eid leave yet.</div>
+          <div class="form-row">
+            <div class="field"><label>Eid Al Fitr — Year</label><input type="number" id="cfgEidFitrYear" placeholder="e.g. 2027"></div>
+            <div class="field"><label>Eid Al Fitr — Date</label><input type="date" id="cfgEidFitrDate"></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label>Eid Al Adha — Year</label><input type="number" id="cfgEidAdhaYear" placeholder="e.g. 2027"></div>
+            <div class="field"><label>Eid Al Adha — Date</label><input type="date" id="cfgEidAdhaDate"></div>
+          </div>
+          <button class="btn btn-primary" onclick="saveConfig()">Save</button>
+        </div>
+        <div class="card card-pad">
           <div class="section-title">WhatsApp Notifications (CallMeBot)</div>
           <div class="sub" style="margin-bottom:12px;">When a staff member submits a leave request for approval, a WhatsApp message with the TC No, name and leave details is sent automatically to this number so it can be approved quickly. Uses the free <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">CallMeBot WhatsApp API</a> — add the CallMeBot number on WhatsApp and send it the activation message shown on their site to get your API key.</div>
           <div class="form-row">
@@ -1353,7 +1366,13 @@ let CFG = {
   // whatsappPhone must include the country code (e.g. 9665XXXXXXXX), whatsappApiKey is the
   // key CallMeBot issued after the approver added the bot on WhatsApp, whatsappAppUrl is an
   // optional link appended to the message so the approver can tap straight into the app.
-  whatsappPhone: '', whatsappApiKey: '', whatsappAppUrl: ''
+  whatsappPhone: '', whatsappApiKey: '', whatsappAppUrl: '',
+  // Manual override for a year the hardcoded EID_AL_FITR_FIRST_DAY / EID_AL_ADHA_FIRST_DAY
+  // tables don't cover yet (see holidayDateForYear) — set from Settings once the admin knows
+  // or calculates the date for an upcoming year, so a new staff member's joining-date cutoff
+  // check works correctly even before anyone has actually taken that year's Eid leave.
+  eidFitrOverrideYear: '', eidFitrOverrideDate: '',
+  eidAdhaOverrideYear: '', eidAdhaOverrideDate: ''
 };
 
 const LEAVE_CATEGORIES = ["Emergency", "Local", "Annual Leave"];
@@ -1624,6 +1643,10 @@ function initListeners(){
     document.getElementById('cfgWhatsappPhone').value = CFG.whatsappPhone||'';
     document.getElementById('cfgWhatsappApiKey').value = CFG.whatsappApiKey||'';
     document.getElementById('cfgWhatsappAppUrl').value = CFG.whatsappAppUrl||'';
+    document.getElementById('cfgEidFitrYear').value = CFG.eidFitrOverrideYear||'';
+    document.getElementById('cfgEidFitrDate').value = CFG.eidFitrOverrideDate||'';
+    document.getElementById('cfgEidAdhaYear').value = CFG.eidAdhaOverrideYear||'';
+    document.getElementById('cfgEidAdhaDate').value = CFG.eidAdhaOverrideDate||'';
     refreshAll();
     checkPassportExpiryAlerts();
   });
@@ -2099,12 +2122,16 @@ const EID_AL_ADHA_FIRST_DAY = {
 function holidayDateForYear(type, year){
   if(type==='National Day') return `${year}-09-23`;
   if(type==='Foundation Day') return `${year}-02-22`;
-  // The authoritative hardcoded table is checked FIRST (not the other way around) for any
-  // year it covers. Reason: a leave record's "year" field is set by hand (or by a bulk-import
-  // CSV) and isn't guaranteed to be the calendar year its fromDate actually falls in — a single
-  // mistagged record anywhere in the data (for any staff, not just the one being checked) would
-  // otherwise silently override the real date and defeat the joining-year cutoff check. Only
-  // outside the table's range do we fall back to whatever a real leave record shows.
+  // Lookup order: (1) the admin's manual Settings override for this exact year — lets a year
+  // outside the hardcoded table below be handled correctly as soon as the admin knows/
+  // calculates the date, even before anyone has taken that year's Eid leave; then (2) the
+  // authoritative hardcoded table for any year it covers — checked BEFORE any existing leave
+  // record because a record's "year" field is set by hand (or by a bulk-import CSV) and isn't
+  // guaranteed to match the calendar year its fromDate actually falls in, so a single mistagged
+  // record anywhere in the data could otherwise silently override the real date; and finally
+  // (3) whatever a real leave record shows, for years outside both of the above.
+  if(type==='Eid Al Fitr Leave' && Number(CFG.eidFitrOverrideYear)===Number(year) && CFG.eidFitrOverrideDate) return CFG.eidFitrOverrideDate;
+  if(type==='Eid Al Adha Leave' && Number(CFG.eidAdhaOverrideYear)===Number(year) && CFG.eidAdhaOverrideDate) return CFG.eidAdhaOverrideDate;
   if(type==='Eid Al Fitr Leave' && EID_AL_FITR_FIRST_DAY[year]) return EID_AL_FITR_FIRST_DAY[year];
   if(type==='Eid Al Adha Leave' && EID_AL_ADHA_FIRST_DAY[year]) return EID_AL_ADHA_FIRST_DAY[year];
   const rec = leaveList.find(l=> l.type===type && Number(l.year)===Number(year) && l.fromDate);
@@ -4122,7 +4149,11 @@ async function saveConfig(){
     foundationDayNonSaudiDays: Number(document.getElementById('cfgFoundationDayNonSaudi').value)||0,
     whatsappPhone: document.getElementById('cfgWhatsappPhone').value.trim(),
     whatsappApiKey: document.getElementById('cfgWhatsappApiKey').value.trim(),
-    whatsappAppUrl: document.getElementById('cfgWhatsappAppUrl').value.trim()
+    whatsappAppUrl: document.getElementById('cfgWhatsappAppUrl').value.trim(),
+    eidFitrOverrideYear: document.getElementById('cfgEidFitrYear').value.trim(),
+    eidFitrOverrideDate: document.getElementById('cfgEidFitrDate').value,
+    eidAdhaOverrideYear: document.getElementById('cfgEidAdhaYear').value.trim(),
+    eidAdhaOverrideDate: document.getElementById('cfgEidAdhaDate').value
   };
   try{ await db.collection('settings').doc('appConfig').set(data,{merge:true}); toast('Settings saved','ok'); }
   catch(err){ toast('Failed: '+err.message,'err'); }
