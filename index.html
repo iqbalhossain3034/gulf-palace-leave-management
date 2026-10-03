@@ -2099,11 +2099,16 @@ const EID_AL_ADHA_FIRST_DAY = {
 function holidayDateForYear(type, year){
   if(type==='National Day') return `${year}-09-23`;
   if(type==='Foundation Day') return `${year}-02-22`;
-  const rec = leaveList.find(l=> l.type===type && Number(l.year)===Number(year) && l.fromDate);
-  if(rec) return rec.fromDate;
+  // The authoritative hardcoded table is checked FIRST (not the other way around) for any
+  // year it covers. Reason: a leave record's "year" field is set by hand (or by a bulk-import
+  // CSV) and isn't guaranteed to be the calendar year its fromDate actually falls in — a single
+  // mistagged record anywhere in the data (for any staff, not just the one being checked) would
+  // otherwise silently override the real date and defeat the joining-year cutoff check. Only
+  // outside the table's range do we fall back to whatever a real leave record shows.
   if(type==='Eid Al Fitr Leave' && EID_AL_FITR_FIRST_DAY[year]) return EID_AL_FITR_FIRST_DAY[year];
   if(type==='Eid Al Adha Leave' && EID_AL_ADHA_FIRST_DAY[year]) return EID_AL_ADHA_FIRST_DAY[year];
-  return null;
+  const rec = leaveList.find(l=> l.type===type && Number(l.year)===Number(year) && l.fromDate);
+  return rec ? rec.fromDate : null;
 }
 
 function fixedLeaveEntitlementForYear(type, staff, year){
