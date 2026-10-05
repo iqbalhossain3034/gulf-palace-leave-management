@@ -422,11 +422,17 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
 /* Print form */
 .print-only{ display:none; }
 @media print{
+  @page{ size: A4; margin: 15mm; }
   body *{ visibility:hidden; }
   #printArea, #printArea *{ visibility:visible; }
-  #printArea{ position:absolute; top:0; left:0; width:100%; padding:20px; }
+  #printArea{ position:absolute; top:0; left:0; width:100%; padding:0; }
 }
 #printArea{ display:none; }
+/* Used only by the Leave Request print layout: pins the signature block to the bottom of the
+   A4 page regardless of how short the content above it is, instead of it drifting up right
+   after the table. 267mm = 297mm (A4 height) minus the 15mm+15mm @page margin above. */
+.print-page{ position:relative; min-height:267mm; }
+.print-signature-fixed{ position:absolute; left:0; right:0; bottom:0; }
 </style>
 </head>
 <body>
@@ -718,6 +724,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
     <section id="view-contracts" class="view" style="display:none;">
       <div class="topbar">
         <div><h2>Contracts</h2><div class="sub">Contract period, balance, and renewal status</div><div class="divider-motif"></div></div>
+        <button class="btn btn-outline" onclick="printCurrentTable('Contracts','Contract period, balance, and renewal status','#view-contracts table')">🖨️ Print</button>
       </div>
       <div class="card">
         <div class="tbl-wrap">
@@ -845,6 +852,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
     <section id="view-leaveDetails" class="view" style="display:none;">
       <div class="topbar">
         <div><h2>Leave Details</h2><div class="sub">Click any row to view the full leave request as originally submitted</div><div class="divider-motif"></div></div>
+        <button class="btn btn-outline" onclick="printCurrentTable('Leave Details','As currently filtered/searched','#view-leaveDetails table')">🖨️ Print</button>
       </div>
       <div class="toolbar">
         <div class="search-box">
@@ -866,6 +874,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
     <section id="view-leaveApproved" class="view" style="display:none;">
       <div class="topbar">
         <div><h2>Leave Approved</h2><div class="sub">Approved leave records</div><div class="divider-motif"></div></div>
+        <button class="btn btn-outline" onclick="printCurrentTable('Leave Approved','Approved leave records, as currently filtered/searched','#view-leaveApproved table')">🖨️ Print</button>
       </div>
       <div class="toolbar">
         <div class="search-box">
@@ -1205,7 +1214,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
     <div class="modal-head"><h3 id="detailModalTitle">Staff Details</h3><button class="modal-close" onclick="closeModal('detailModalOverlay')">✕</button></div>
     <div class="modal-body" id="detailModalBody"></div>
     <div class="modal-foot">
-      <button class="btn btn-outline" onclick="printLeaveForm()">🖨️ Print Leave Request</button>
+      <button class="btn btn-outline" onclick="printStaffDetails()">🖨️ Print</button>
       <button class="btn btn-ghost" onclick="closeModal('detailModalOverlay')">Close</button>
     </div>
   </div>
@@ -4322,76 +4331,84 @@ function printLeaveRequestForm(){
   }));
 
   const html = `
-    ${printHeaderHTML()}
-    <div style="display:flex; gap:20px; align-items:flex-start; margin-bottom:20px;">
-      ${staffPhotoOrInitialsHTML(s, 80)}
-      <table style="flex:1; border-collapse:collapse; font-size:13px;">
-        <tr>
-          <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">TC No</td><td style="padding:3px 0; font-weight:600;">${s.tcNo}</td>
-          <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Name</td><td style="padding:3px 0; font-weight:600;">${s.name}</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">Position</td><td style="padding:3px 0; font-weight:600;">${s.position}</td>
-          <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Job Band</td><td style="padding:3px 0; font-weight:600;">${s.jobBand||'—'}</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">Department</td><td style="padding:3px 0; font-weight:600;">${s.department||'—'}</td>
-          <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Leave Category</td><td style="padding:3px 0; font-weight:600;">${category}</td>
-        </tr>
-      </table>
+    <div class="print-page">
+      <div>
+        ${printHeaderHTML()}
+        <div style="display:flex; gap:20px; align-items:flex-start; margin-bottom:20px;">
+          ${staffPhotoOrInitialsHTML(s, 80)}
+          <table style="flex:1; border-collapse:collapse; font-size:13px;">
+            <tr>
+              <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">TC No</td><td style="padding:3px 0; font-weight:600;">${s.tcNo}</td>
+              <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Name</td><td style="padding:3px 0; font-weight:600;">${s.name}</td>
+            </tr>
+            <tr>
+              <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">Position</td><td style="padding:3px 0; font-weight:600;">${s.position}</td>
+              <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Job Band</td><td style="padding:3px 0; font-weight:600;">${s.jobBand||'—'}</td>
+            </tr>
+            <tr>
+              <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">Department</td><td style="padding:3px 0; font-weight:600;">${s.department||'—'}</td>
+              <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Leave Category</td><td style="padding:3px 0; font-weight:600;">${category}</td>
+            </tr>
+          </table>
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead><tr style="background:#F0ECE1;">
+            <th style="border:1px solid #ccc; padding:7px;">Leave Type</th>
+            <th style="border:1px solid #ccc; padding:7px;">Year</th>
+            <th style="border:1px solid #ccc; padding:7px;">Start Date</th>
+            <th style="border:1px solid #ccc; padding:7px;">End Date</th>
+            <th style="border:1px solid #ccc; padding:7px;">Days</th>
+            <th style="border:1px solid #ccc; padding:7px;">Remark</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr>
+              <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.type}</td>
+              <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.year}</td>
+              <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.start}</td>
+              <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.end}</td>
+              <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.days}</td>
+              <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.remark}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="print-signature-fixed">${printSignatureHTML()}</div>
     </div>
-    <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-      <thead><tr style="background:#F0ECE1;">
-        <th style="border:1px solid #ccc; padding:7px;">Leave Type</th>
-        <th style="border:1px solid #ccc; padding:7px;">Year</th>
-        <th style="border:1px solid #ccc; padding:7px;">Start Date</th>
-        <th style="border:1px solid #ccc; padding:7px;">End Date</th>
-        <th style="border:1px solid #ccc; padding:7px;">Days</th>
-        <th style="border:1px solid #ccc; padding:7px;">Remark</th>
-      </tr></thead>
-      <tbody>
-        ${rows.map(r=>`<tr>
-          <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.type}</td>
-          <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.year}</td>
-          <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.start}</td>
-          <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.end}</td>
-          <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.days}</td>
-          <td style="border:1px solid #ccc; padding:7px; text-align:center;">${r.remark}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-    ${printSignatureHTML()}
   `;
   doPrint(html);
 }
 
-// Print button on the Staff Detail modal — a simpler balance-summary leave request slip.
-function printLeaveForm(){
-  const tcNo = document.getElementById('detailModalBody').dataset.tcNo;
+// Print button on the Staff Detail modal — prints EVERYTHING currently displayed in that
+// modal (profile info, year-by-year leave balance, Air Ticket History, Self/EOY ticket
+// history, Leave History — whatever openStaffDetail() last rendered into it), exactly as
+// shown. No separate Leave Request form is opened.
+function printStaffDetails(){
+  const bodyEl = document.getElementById('detailModalBody');
+  const tcNo = bodyEl.dataset.tcNo;
   const s = staffList.find(x=>x.tcNo===tcNo);
   if(!s){ toast('Staff not found','err'); return; }
-  const b = leaveBalance(s);
+  const titleText = document.getElementById('detailModalTitle').textContent || s.name;
   const html = `
     ${printHeaderHTML()}
-    <div style="display:flex; gap:20px; align-items:flex-start; margin-bottom:20px;">
-      ${staffPhotoOrInitialsHTML(s, 80)}
-      <table style="flex:1; border-collapse:collapse; font-size:13px;">
-        <tr>
-          <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">TC No</td><td style="padding:3px 0; font-weight:600;">${s.tcNo}</td>
-          <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Name</td><td style="padding:3px 0; font-weight:600;">${s.name}</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">Position</td><td style="padding:3px 0; font-weight:600;">${s.position}</td>
-          <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Job Band</td><td style="padding:3px 0; font-weight:600;">${s.jobBand||'—'}</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 10px 3px 0; color:#5B6B7A; white-space:nowrap;">Department</td><td style="padding:3px 0; font-weight:600;">${s.department||'—'}</td>
-          <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Date</td><td style="padding:3px 0; font-weight:600;">${fmtDate(todayISO())}</td>
-        </tr>
-      </table>
-    </div>
-    <div style="font-size:13px; margin-top:6px;"><b>Current Annual Leave Balance:</b> ${b.balance.toFixed(2)} days</div>
-    ${printSignatureHTML()}
+    <div style="font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:#0E2439; margin-bottom:2px;">Staff Details — ${titleText}</div>
+    <div style="font-size:12px; color:#5B6B7A; margin-bottom:16px;">Printed ${fmtDate(todayISO())}</div>
+    <div style="font-size:12.5px;">${bodyEl.innerHTML}</div>
+  `;
+  doPrint(html);
+}
+
+// Generic print helper for a currently-displayed list page (Contracts, Leave Details, Leave
+// Approved, etc.) — clones the live table exactly as currently rendered (respecting any active
+// search/filter on screen), so what prints always matches what's on screen. No other form is
+// opened.
+function printCurrentTable(title, subtitle, tableSelector){
+  const tableEl = document.querySelector(tableSelector);
+  if(!tableEl){ toast('Nothing to print', 'err'); return; }
+  const html = `
+    ${printHeaderHTML()}
+    <div style="font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:#0E2439; margin-bottom:2px;">${title}</div>
+    <div style="font-size:12px; color:#5B6B7A; margin-bottom:16px;">${subtitle} — printed ${fmtDate(todayISO())}</div>
+    <div style="font-size:12px;">${tableEl.outerHTML}</div>
   `;
   doPrint(html);
 }
