@@ -4398,6 +4398,26 @@ async function sheetsApiPut(sheetId, range, values){
   return res.json();
 }
 
+// A brand-new Google Sheet only has "Sheet1" — spreadsheets.values.update fails outright if
+// the tab named in the range (e.g. "Staff!A1") doesn't exist yet. This checks which of our
+// tabs are missing and creates them in one batchUpdate call before any values are written.
+async function ensureGoogleSheetTabsExist(sheetId, titles){
+  const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}?fields=sheets.properties.title`, {
+    headers: { 'Authorization': 'Bearer '+googleAccessToken }
+  });
+  if(!getRes.ok){ const t = await getRes.text().catch(()=>''); throw new Error('Sheets API '+getRes.status+': '+t.slice(0,200)); }
+  const data = await getRes.json();
+  const existing = (data.sheets||[]).map(s=> s.properties.title);
+  const missing = titles.filter(t=> !existing.includes(t));
+  if(missing.length===0) return;
+  const addRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}:batchUpdate`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer '+googleAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: missing.map(title=> ({ addSheet: { properties: { title } } })) })
+  });
+  if(!addRes.ok){ const t = await addRes.text().catch(()=>''); throw new Error('Sheets API '+addRes.status+': '+t.slice(0,200)); }
+}
+
 async function syncToGoogleSheet(manual){
   if(!CFG.googleSheetId){ if(manual) toast('Enter and Save a Google Sheet ID first', 'err'); return; }
   if(googleSyncInFlight) return;
@@ -4411,6 +4431,7 @@ async function syncToGoogleSheet(manual){
   }
   googleSyncInFlight = true;
   try{
+    await ensureGoogleSheetTabsExist(CFG.googleSheetId, ['Staff','LeaveRecords']);
     const staffRows = [
       ['TC No','Name','Position','Department','Status','Joining Date','Passport Expiry','Phone','Email'],
       ...staffList.map(s=> [s.tcNo, s.name, s.position||'', s.department||'', s.status||'', s.joiningDate||'', s.passportExpiry||'', s.phone||'', s.email||''])
