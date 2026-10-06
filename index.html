@@ -4418,6 +4418,17 @@ async function ensureGoogleSheetTabsExist(sheetId, titles){
   if(!addRes.ok){ const t = await addRes.text().catch(()=>''); throw new Error('Sheets API '+addRes.status+': '+t.slice(0,200)); }
 }
 
+// Formats an ISO (YYYY-MM-DD) date as DD-MM-YYYY, prefixed with a leading apostrophe so
+// Google Sheets stores it as literal TEXT rather than auto-detecting it as a date and
+// reformatting/re-ordering it according to the spreadsheet's locale (this happens regardless
+// of valueInputOption=RAW — RAW only skips formula evaluation, not date/number auto-detection).
+function sheetDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = String(iso).split('-');
+  if(!y||!m||!d) return "'"+iso;
+  return "'"+d+'-'+m+'-'+y;
+}
+
 async function syncToGoogleSheet(manual){
   if(!CFG.googleSheetId){ if(manual) toast('Enter and Save a Google Sheet ID first', 'err'); return; }
   if(googleSyncInFlight) return;
@@ -4431,18 +4442,69 @@ async function syncToGoogleSheet(manual){
   }
   googleSyncInFlight = true;
   try{
-    await ensureGoogleSheetTabsExist(CFG.googleSheetId, ['Staff','LeaveRecords']);
+    await ensureGoogleSheetTabsExist(CFG.googleSheetId, ['Staff','LeaveRecords','LocalLeaveYearly','AirTicketHistory']);
+
+    // Staff — same fields as before, dates forced to DD-MM-YYYY text.
     const staffRows = [
       ['TC No','Name','Position','Department','Status','Joining Date','Passport Expiry','Phone','Email'],
-      ...staffList.map(s=> [s.tcNo, s.name, s.position||'', s.department||'', s.status||'', s.joiningDate||'', s.passportExpiry||'', s.phone||'', s.email||''])
+      ...staffList.map(s=> [s.tcNo, s.name, s.position||'', s.department||'', s.status||'', sheetDate(s.joiningDate), sheetDate(s.passportExpiry), s.phone||'', s.email||''])
     ];
+
+    // Leave Records — same fields as before, dates forced to DD-MM-YYYY text.
     const serialMap = computeGroupSerialMap();
     const leaveRows = [
       ['S/N','TC No','Name','Category','Type','Start Date','End Date','Days','Status','Ticket Type'],
-      ...leaveList.map(l=> [serialMap[l.groupId||l.id]||'', l.tcNo, l.name||'', l.category||'', l.type||'', l.fromDate||'', l.toDate||'', l.days||'', l.status||'', l.ticketType||''])
+      ...leaveList.map(l=> [serialMap[l.groupId||l.id]||'', l.tcNo, l.name||'', l.category||'', l.type||'', sheetDate(l.fromDate), sheetDate(l.toDate), l.days||'', l.status||'', l.ticketType||''])
     ];
+
+    // Local Leave Yearly — mirrors the Staff Detail modal's "Year-by-Year Local Leave —
+    // Outstanding Days" table, one row per staff per year from their joining year to now.
+    const yearTypes = ['Eid Al Fitr Leave','Eid Al Adha Leave','National Day','Foundation Day'];
+    const localLeaveRows = [['TC No','Name','Year',
+      'Eid Al Fitr Taken','Eid Al Fitr Entitlement',
+      'Eid Al Adha Taken','Eid Al Adha Entitlement',
+      'National Day Taken','National Day Entitlement',
+      'Foundation Day Taken','Foundation Day Entitlement',
+      'Outstanding (Total)']];
+    staffList.forEach(s=>{
+      const joinYear = new Date(s.joiningDate).getFullYear();
+      const curYear = new Date().getFullYear();
+      for(let y=curYear; y>=joinYear; y--){
+        let yearTotalOutstanding = 0;
+        const cells = [];
+        yearTypes.forEach(type=>{
+          const entitlement = fixedLeaveEntitlementForYear(type, s, y);
+          const taken = entitlement>0 ? fixedLeaveTakenDays(s.tcNo, type, y, null) : 0;
+          if(entitlement>0) yearTotalOutstanding += Math.max(0, entitlement - taken - fixedLeaveConvertedOTDays(s.tcNo, type, y, null));
+          cells.push(taken, entitlement);
+        });
+        if(cells.some((v,i)=> i%2===1 && v>0)){ // only rows where at least one type has entitlement that year
+          localLeaveRows.push([s.tcNo, s.name, y, ...cells, yearTotalOutstanding]);
+        }
+      }
+    });
+
+    // Air Ticket History — mirrors both ticket tables in the Staff Detail modal (Company
+    // Ticket periods, and the separate Self Ticket/Employee of the Year history), combined
+    // into one tab with a "Source" column to tell them apart.
+    const ticketRows = [['TC No','Name','Source','Period Start','Period End','Vacation No.','Status','Used Date','Ticket Type']];
+    staffList.forEach(s=>{
+      const ti = ticketInfo(s);
+      const vSerial = computeAnnualLeaveSerialForStaff(s);
+      ti.periods.forEach(p=>{
+        ticketRows.push([s.tcNo, s.name, 'Company Ticket Period', sheetDate(p.start), sheetDate(p.end),
+          (p.groupId&&vSerial[p.groupId])?ordinalSuffix(vSerial[p.groupId]):'', p.status, sheetDate(p.usedDate), p.ticketType||'']);
+      });
+      ti.otherTickets.forEach(o=>{
+        ticketRows.push([s.tcNo, s.name, 'Self/Employee of the Year', '', '',
+          vSerial[o.groupId]?ordinalSuffix(vSerial[o.groupId]):'', '', sheetDate(o.date), o.type]);
+      });
+    });
+
     await sheetsApiPut(CFG.googleSheetId, 'Staff!A1', staffRows);
     await sheetsApiPut(CFG.googleSheetId, 'LeaveRecords!A1', leaveRows);
+    await sheetsApiPut(CFG.googleSheetId, 'LocalLeaveYearly!A1', localLeaveRows);
+    await sheetsApiPut(CFG.googleSheetId, 'AirTicketHistory!A1', ticketRows);
     setGoogleSyncStatus('Connected — last synced: '+new Date().toLocaleTimeString());
     if(manual) toast('Synced to Google Sheet', 'ok');
   }catch(err){
