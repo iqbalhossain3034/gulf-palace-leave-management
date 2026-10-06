@@ -12,6 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <style>
 :root{
@@ -1073,6 +1074,27 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
           <button class="btn btn-primary" onclick="saveConfig()">Save</button>
         </div>
         <div class="card card-pad">
+          <div class="section-title">Google Sheet Auto-Backup (Experimental)</div>
+          <div class="sub" style="margin-bottom:12px;">Keeps a read-only backup copy of Staff and Leave data in a Google Sheet, updated automatically in the background while this page is open — so you still have the data to look at even if this web app itself can't be opened. This is a BACKUP, not a second way to edit data; always make real changes here in the app.</div>
+          <div class="note-box" style="margin-bottom:14px;">
+            One-time setup needed (ask me to walk you through it if unsure):<br>
+            1. In Google Cloud Console, create a project, enable the "Google Sheets API", and create an OAuth 2.0 Client ID (type: Web application) with this page's URL added under "Authorized JavaScript origins".<br>
+            2. Create a blank Google Sheet in your Google Drive. Copy its ID from the URL (the long part between <code>/d/</code> and <code>/edit</code>).<br>
+            3. Paste both below, click Save, then click "Connect Google Account" once.
+          </div>
+          <div class="form-row">
+            <div class="field"><label>Google OAuth Client ID</label><input type="text" id="cfgGoogleClientId" placeholder="xxxxxxxx.apps.googleusercontent.com"></div>
+            <div class="field"><label>Google Sheet ID</label><input type="text" id="cfgGoogleSheetId" placeholder="from the sheet's URL"></div>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin:10px 0;">
+            <input type="checkbox" id="cfgGoogleSyncEnabled" style="width:auto;"> Enable automatic background sync
+          </label>
+          <div id="googleSyncStatus" class="sub" style="margin-bottom:10px;">Not connected yet.</div>
+          <button class="btn btn-outline" onclick="connectGoogleAccount()" style="margin-right:8px;">Connect Google Account</button>
+          <button class="btn btn-outline" onclick="syncToGoogleSheet(true)" style="margin-right:8px;">Sync Now</button>
+          <button class="btn btn-primary" onclick="saveConfig()">Save</button>
+        </div>
+        <div class="card card-pad">
           <div class="section-title">Eid Date Override (for a new year)</div>
           <div class="sub" style="margin-bottom:12px;">Only needed for a year not already covered automatically (currently 2010–2026). As soon as you know or calculate the upcoming Eid Al Fitr / Eid Al Adha date, set it here — this lets a new staff member's joining-date cutoff work correctly even before anyone has taken that year's Eid leave yet.</div>
           <div class="form-row">
@@ -1381,7 +1403,13 @@ let CFG = {
   // or calculates the date for an upcoming year, so a new staff member's joining-date cutoff
   // check works correctly even before anyone has actually taken that year's Eid leave.
   eidFitrOverrideYear: '', eidFitrOverrideDate: '',
-  eidAdhaOverrideYear: '', eidAdhaOverrideDate: ''
+  eidAdhaOverrideYear: '', eidAdhaOverrideDate: '',
+  // Google Sheet auto-backup (Settings → Google Sheet Auto-Backup). googleClientId and
+  // googleSheetId are entered once by the admin; googleSyncEnabled turns the background sync
+  // on/off. The OAuth access token itself is never stored here — it's kept only in memory for
+  // the current browser tab (see googleAccessToken below) and has to be re-granted each new
+  // session, which is normal/expected for this kind of token.
+  googleClientId: '', googleSheetId: '', googleSyncEnabled: false
 };
 
 const LEAVE_CATEGORIES = ["Emergency", "Local", "Annual Leave"];
@@ -1629,11 +1657,13 @@ function initListeners(){
     resolveCurrentUser();
     refreshAll();
     checkPassportExpiryAlerts();
+    scheduleGoogleSync();
   }, err=> toast('Failed to load staff: '+err.message, 'err'));
 
   unsubLeave = db.collection('leaves').orderBy('fromDate','desc').onSnapshot(snap=>{
     leaveList = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     refreshAll();
+    scheduleGoogleSync();
   }, err=> toast('Failed to load leaves: '+err.message, 'err'));
 
   unsubConfig = db.collection('settings').doc('appConfig').onSnapshot(doc=>{
@@ -1656,8 +1686,12 @@ function initListeners(){
     document.getElementById('cfgEidFitrDate').value = CFG.eidFitrOverrideDate||'';
     document.getElementById('cfgEidAdhaYear').value = CFG.eidAdhaOverrideYear||'';
     document.getElementById('cfgEidAdhaDate').value = CFG.eidAdhaOverrideDate||'';
+    document.getElementById('cfgGoogleClientId').value = CFG.googleClientId||'';
+    document.getElementById('cfgGoogleSheetId').value = CFG.googleSheetId||'';
+    document.getElementById('cfgGoogleSyncEnabled').checked = !!CFG.googleSyncEnabled;
     refreshAll();
     checkPassportExpiryAlerts();
+    scheduleGoogleSync();
   });
 
   unsubLeaveTypes = db.collection('leaveTypes').orderBy('order').onSnapshot(snap=>{
@@ -4162,7 +4196,10 @@ async function saveConfig(){
     eidFitrOverrideYear: document.getElementById('cfgEidFitrYear').value.trim(),
     eidFitrOverrideDate: document.getElementById('cfgEidFitrDate').value,
     eidAdhaOverrideYear: document.getElementById('cfgEidAdhaYear').value.trim(),
-    eidAdhaOverrideDate: document.getElementById('cfgEidAdhaDate').value
+    eidAdhaOverrideDate: document.getElementById('cfgEidAdhaDate').value,
+    googleClientId: document.getElementById('cfgGoogleClientId').value.trim(),
+    googleSheetId: document.getElementById('cfgGoogleSheetId').value.trim(),
+    googleSyncEnabled: document.getElementById('cfgGoogleSyncEnabled').checked
   };
   try{ await db.collection('settings').doc('appConfig').set(data,{merge:true}); toast('Settings saved','ok'); }
   catch(err){ toast('Failed: '+err.message,'err'); }
@@ -4272,6 +4309,127 @@ async function deleteLeaveType(id){
   if(!confirm('Delete this leave type? Existing leave records using it will be unaffected.')) return;
   try{ await db.collection('leaveTypes').doc(id).delete(); toast('Leave type deleted', 'ok'); }
   catch(err){ toast('Failed: '+err.message, 'err'); }
+}
+
+/* =========================================================================
+   GOOGLE SHEET AUTO-BACKUP — read-only mirror of Staff + Leave data, kept
+   updated in the background (via the Sheets API) while this page is open.
+   Not a second way to edit data — the app + Firestore remain the only real
+   source of truth; this just gives the admin something to look at if the
+   app itself can't be opened. Uses Google Identity Services for OAuth (no
+   server, no stored credentials) — the access token lives only in memory
+   for this tab and must be re-granted each new browser session.
+   ========================================================================= */
+let googleTokenClient = null;
+let googleAccessToken = null;
+let googleTokenExpiresAt = 0;
+let googleSyncTimer = null;
+let googleSyncInFlight = false;
+
+function setGoogleSyncStatus(text){
+  const el = document.getElementById('googleSyncStatus');
+  if(el) el.textContent = text;
+}
+
+function connectGoogleAccount(){
+  if(typeof google==='undefined' || !google.accounts){ toast('Google sign-in script not loaded yet — try again in a moment', 'err'); return; }
+  const clientId = (document.getElementById('cfgGoogleClientId')?.value || CFG.googleClientId || '').trim();
+  if(!clientId){ toast('Enter the Google OAuth Client ID first, then Save, before connecting', 'err'); return; }
+  if(!googleTokenClient || googleTokenClient._clientId!==clientId){
+    googleTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      callback: (resp)=>{
+        if(resp && resp.access_token){
+          googleAccessToken = resp.access_token;
+          googleTokenExpiresAt = Date.now() + (Number(resp.expires_in||3600)-60)*1000; // refresh 1 min early
+          setGoogleSyncStatus('Connected — last synced: not yet this session');
+          syncToGoogleSheet(true);
+        } else {
+          setGoogleSyncStatus('Connection failed — click "Connect Google Account" to try again.');
+        }
+      }
+    });
+    googleTokenClient._clientId = clientId;
+  }
+  googleTokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+// Called after every staff/leave/config refresh. Debounced so a burst of Firestore writes
+// (e.g. Bulk Import) triggers one sync a few seconds later, not one per record.
+function scheduleGoogleSync(){
+  if(!CFG.googleSyncEnabled || !CFG.googleSheetId) return;
+  if(googleSyncTimer) clearTimeout(googleSyncTimer);
+  googleSyncTimer = setTimeout(()=> syncToGoogleSheet(false), 6000);
+}
+
+async function ensureGoogleToken(){
+  if(googleAccessToken && Date.now() < googleTokenExpiresAt) return true;
+  if(!googleTokenClient){
+    const clientId = (CFG.googleClientId||'').trim();
+    if(!clientId || typeof google==='undefined' || !google.accounts) return false;
+    googleTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      callback: (resp)=>{
+        if(resp && resp.access_token){
+          googleAccessToken = resp.access_token;
+          googleTokenExpiresAt = Date.now() + (Number(resp.expires_in||3600)-60)*1000;
+        }
+      }
+    });
+    googleTokenClient._clientId = clientId;
+  }
+  // Silent attempt (no popup) — works only if the admin has already granted access this
+  // browser session via "Connect Google Account". If it hasn't been granted yet, this quietly
+  // does nothing and the next scheduled sync will try again.
+  try{ googleTokenClient.requestAccessToken({ prompt: '' }); }catch(e){}
+  return false; // the token arrives asynchronously via the callback above; this sync attempt stops here
+}
+
+async function sheetsApiPut(sheetId, range, values){
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Authorization': 'Bearer '+googleAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values })
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Sheets API '+res.status+': '+t.slice(0,200)); }
+  return res.json();
+}
+
+async function syncToGoogleSheet(manual){
+  if(!CFG.googleSheetId){ if(manual) toast('Enter and Save a Google Sheet ID first', 'err'); return; }
+  if(googleSyncInFlight) return;
+  if(!googleAccessToken || Date.now() >= googleTokenExpiresAt){
+    const ok = await ensureGoogleToken();
+    if(!ok && !googleAccessToken){
+      setGoogleSyncStatus('Not connected — click "Connect Google Account".');
+      if(manual) toast('Click "Connect Google Account" first', 'err');
+      return;
+    }
+  }
+  googleSyncInFlight = true;
+  try{
+    const staffRows = [
+      ['TC No','Name','Position','Department','Status','Joining Date','Passport Expiry','Phone','Email'],
+      ...staffList.map(s=> [s.tcNo, s.name, s.position||'', s.department||'', s.status||'', s.joiningDate||'', s.passportExpiry||'', s.phone||'', s.email||''])
+    ];
+    const serialMap = computeGroupSerialMap();
+    const leaveRows = [
+      ['S/N','TC No','Name','Category','Type','Start Date','End Date','Days','Status','Ticket Type'],
+      ...leaveList.map(l=> [serialMap[l.groupId||l.id]||'', l.tcNo, l.name||'', l.category||'', l.type||'', l.fromDate||'', l.toDate||'', l.days||'', l.status||'', l.ticketType||''])
+    ];
+    await sheetsApiPut(CFG.googleSheetId, 'Staff!A1', staffRows);
+    await sheetsApiPut(CFG.googleSheetId, 'LeaveRecords!A1', leaveRows);
+    setGoogleSyncStatus('Connected — last synced: '+new Date().toLocaleTimeString());
+    if(manual) toast('Synced to Google Sheet', 'ok');
+  }catch(err){
+    setGoogleSyncStatus('Sync failed: '+err.message);
+    if(manual) toast('Sync failed: '+err.message, 'err');
+  }finally{
+    googleSyncInFlight = false;
+  }
 }
 
 /* =========================================================================
