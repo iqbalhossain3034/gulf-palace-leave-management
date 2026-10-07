@@ -4398,6 +4398,20 @@ async function sheetsApiPut(sheetId, range, values){
   return res.json();
 }
 
+// Wipes every cell in a tab before a fresh write. Needed because values.update only writes
+// exactly the rows it's given — if a previous sync had MORE rows than this one (a staff or
+// leave record was removed/merged since), the old extra rows at the bottom are otherwise left
+// behind untouched forever, sitting just outside the Table's resized range (looks like a stray
+// duplicate row below the table).
+async function clearSheetTab(sheetId, tabTitle){
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/${encodeURIComponent(tabTitle)}:clear`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer '+googleAccessToken, 'Content-Type': 'application/json' }
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Sheets API '+res.status+': '+t.slice(0,200)); }
+}
+
 // A brand-new Google Sheet only has "Sheet1" — spreadsheets.values.update fails outright if
 // the tab named in the range (e.g. "Staff!A1") doesn't exist yet. This checks which of our
 // tabs are missing and creates them in one batchUpdate call before any values are written.
@@ -4537,6 +4551,7 @@ async function syncToGoogleSheet(manual){
       });
     });
 
+    await Promise.all(['Staff','LeaveRecords','LocalLeaveYearly','AirTicketHistory'].map(t=> clearSheetTab(CFG.googleSheetId, t)));
     await sheetsApiPut(CFG.googleSheetId, 'Staff!A1', staffRows);
     await sheetsApiPut(CFG.googleSheetId, 'LeaveRecords!A1', leaveRows);
     await sheetsApiPut(CFG.googleSheetId, 'LocalLeaveYearly!A1', localLeaveRows);
