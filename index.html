@@ -4429,6 +4429,42 @@ function sheetDate(iso){
   return "'"+d+'-'+m+'-'+y;
 }
 
+// Turns each tab's data range into a native Google Sheets "Table" (Insert > Table — filters,
+// striped rows, etc.) with a specific name, and keeps that table's range resized to match the
+// current row/column count every sync. tabSpecs: [{title, tableName, rows, cols}, ...]. One
+// GET (to find each tab's internal sheetId and any table already on it) + one batchUpdate
+// (addTable for a tab that has none yet, updateTable to rename/resize one that already exists)
+// — covers all tabs in a single pair of calls rather than one per tab.
+async function ensureGoogleSheetTables(spreadsheetId, tabSpecs){
+  const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets(properties(sheetId,title),tables(tableId,name,range))`, {
+    headers: { 'Authorization': 'Bearer '+googleAccessToken }
+  });
+  if(!getRes.ok){ const t = await getRes.text().catch(()=>''); throw new Error('Sheets API '+getRes.status+': '+t.slice(0,200)); }
+  const data = await getRes.json();
+  const sheetsByTitle = {};
+  (data.sheets||[]).forEach(sh=> sheetsByTitle[sh.properties.title] = sh);
+
+  const requests = [];
+  tabSpecs.forEach(spec=>{
+    const sh = sheetsByTitle[spec.title];
+    if(!sh) return; // tab wasn't found (shouldn't happen — ensureGoogleSheetTabsExist runs first)
+    const range = { sheetId: sh.properties.sheetId, startRowIndex: 0, endRowIndex: spec.rows, startColumnIndex: 0, endColumnIndex: spec.cols };
+    const existing = (sh.tables||[])[0];
+    if(existing){
+      requests.push({ updateTable: { table: { tableId: existing.tableId, name: spec.tableName, range }, fields: 'name,range' } });
+    } else {
+      requests.push({ addTable: { table: { tableId: spec.title, name: spec.tableName, range } } });
+    }
+  });
+  if(requests.length===0) return;
+  const postRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer '+googleAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests })
+  });
+  if(!postRes.ok){ const t = await postRes.text().catch(()=>''); throw new Error('Sheets API '+postRes.status+': '+t.slice(0,200)); }
+}
+
 async function syncToGoogleSheet(manual){
   if(!CFG.googleSheetId){ if(manual) toast('Enter and Save a Google Sheet ID first', 'err'); return; }
   if(googleSyncInFlight) return;
@@ -4505,6 +4541,12 @@ async function syncToGoogleSheet(manual){
     await sheetsApiPut(CFG.googleSheetId, 'LeaveRecords!A1', leaveRows);
     await sheetsApiPut(CFG.googleSheetId, 'LocalLeaveYearly!A1', localLeaveRows);
     await sheetsApiPut(CFG.googleSheetId, 'AirTicketHistory!A1', ticketRows);
+    await ensureGoogleSheetTables(CFG.googleSheetId, [
+      { title:'LeaveRecords',     tableName:'Table1', rows:leaveRows.length,      cols:leaveRows[0].length },
+      { title:'LocalLeaveYearly', tableName:'Table2', rows:localLeaveRows.length, cols:localLeaveRows[0].length },
+      { title:'AirTicketHistory', tableName:'Table3', rows:ticketRows.length,     cols:ticketRows[0].length },
+      { title:'Staff',            tableName:'Table4', rows:staffRows.length,      cols:staffRows[0].length }
+    ]);
     setGoogleSyncStatus('Connected — last synced: '+new Date().toLocaleTimeString());
     if(manual) toast('Synced to Google Sheet', 'ok');
   }catch(err){
