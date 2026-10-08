@@ -2322,6 +2322,15 @@ function removeMatrixRow(rowId){
 // at all. This only affects the live on-screen warning; the real save-time check in
 // submitLeaveRequest() always re-validates the final values regardless of this delay.
 let rowCalcTimers = {};
+// True only while submitLeaveRequest() is waiting on the Firestore commit. During that window
+// Firestore's local cache already contains the just-written records and fires onSnapshot →
+// refreshAll() → refreshAllRowsCalc(), which would otherwise re-run the live balance/overlap
+// check on the still-visible form and match the new request against ITSELF (a brand-new
+// request has no groupId to exclude), flashing a false red "overlap" warning until the save
+// finishes and the page switches away. Skipping the live check during that window removes the
+// flash; the authoritative duplicate check inside submitLeaveRequest() runs BEFORE this flag
+// is set, against the pre-save data, so real duplicates are still blocked exactly as before.
+let leaveSaveInProgress = false;
 function updateRowCalcDebounced(rowId){
   clearTimeout(rowCalcTimers[rowId]);
   rowCalcTimers[rowId] = setTimeout(()=> updateRowCalc(rowId), 350);
@@ -2340,6 +2349,7 @@ function clearAllRowCalcTimers(){
 }
 
 function updateRowCalc(rowId){
+  if(leaveSaveInProgress) return; // see leaveSaveInProgress above — no live checks mid-save
   const row = document.querySelector(`.matrix-row[data-row-id="${rowId}"]`);
   if(!row) return;
   const type = row.querySelector('.mr-type').value;
@@ -2761,6 +2771,9 @@ async function submitLeaveRequest(){
     if(!proceed) return;
   }
 
+  // All validation (including the real duplicate/overlap check above) has passed — from here
+  // until the commit settles, suppress the live on-screen checks (see leaveSaveInProgress).
+  leaveSaveInProgress = true;
   try{
     const ticketType = (category==='Annual Leave') ? document.getElementById('lr_ticketType').value : 'None';
     const ticketPeriodStart = (ticketType!=='None') ? (document.getElementById('lr_ticketPeriod').value || null) : null;
@@ -2811,7 +2824,11 @@ async function submitLeaveRequest(){
       if(!isAdmin) notifyApproverOfLeaveRequest(tcNo, s.name, category, entries);
     }
     showView(editingGroupOrigin==='approvals' ? 'approvals' : 'leaveDetails');
-  }catch(err){ toast('Failed to save: '+err.message, 'err'); }
+  }catch(err){
+    toast('Failed to save: '+err.message, 'err');
+  }finally{
+    leaveSaveInProgress = false;
+  }
 }
 
 // Approvals page shows ONE row per complete Leave Request (same grouping model as Leave
