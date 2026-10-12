@@ -945,7 +945,7 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
         <div class="section-title">This Year's Applied History</div>
         <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Type</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th><th>Taken With</th></tr></thead>
+          <thead><tr><th>Type</th><th>Year</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th><th>Taken With</th></tr></thead>
           <tbody id="localLeaveHistoryTbody"></tbody>
         </table>
         </div>
@@ -3870,7 +3870,7 @@ function renderLocalLeaveHistory(){
   const types = ['Eid Al Fitr Leave','Eid Al Adha Leave','National Day','Foundation Day'];
   const rows = leaveList.filter(l=> types.includes(l.type) && l.year===year).sort((a,b)=>a.type.localeCompare(b.type));
   const tbody = document.getElementById('localLeaveHistoryTbody');
-  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet for this year</td></tr>'; return; }
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet for this year</td></tr>'; return; }
   tbody.innerHTML = rows.map(l=>{
     // Was this local leave part of a bigger Annual Leave trip (i.e. the same submitted
     // request also contains an Annual Leave entry), or was it taken on its own locally?
@@ -3883,7 +3883,10 @@ function renderLocalLeaveHistory(){
     if(l.convertedToOT) tag = '<span class="badge badge-warning">Converted to OT</span>';
     else if(withAnnual) tag = '<span class="badge badge-info">With Annual Leave</span>';
     else tag = '<span class="badge badge-success">Taken Locally</span>';
-    return `<tr><td>${l.type}</td><td>${l.tcNo}</td><td>${l.name}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${tag}</td></tr>`;
+    // Year = the entitlement year this local leave belongs to (the record's own "year" field),
+    // which is not always the calendar year of its dates — e.g. a holiday taken in early January
+    // can still be counted against the previous year's entitlement.
+    return `<tr><td>${l.type}</td><td>${l.year||'—'}</td><td>${l.tcNo}</td><td>${l.name}</td><td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td><td>${l.days}</td><td>${tag}</td></tr>`;
   }).join('');
 }
 
