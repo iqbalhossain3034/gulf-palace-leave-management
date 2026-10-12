@@ -942,8 +942,8 @@ tr.row-overlaps-existing .mr-start{ border-color:var(--danger) !important; }
       </div>
 
       <div class="card card-pad" style="margin-top:18px;">
-        <div class="section-title">This Year's Applied History</div>
-        <div class="tbl-wrap">
+        <div class="section-title">Applied History — All Years</div>
+        <div class="tbl-wrap" style="max-height:520px; overflow-y:auto;">
         <table>
           <thead><tr><th>Type</th><th>Year</th><th>TC No</th><th>Name</th><th>From</th><th>To</th><th>Days</th><th>Taken With</th></tr></thead>
           <tbody id="localLeaveHistoryTbody"></tbody>
@@ -3865,12 +3865,16 @@ function updateLocalLeaveDaysLabel(prefix){
 function loadLocalLeaveYear(){
   renderLocalLeaveHistory();
 }
+// Lists the applied Saudi local leave history for ALL years (not just the one selected in the
+// year dropdown above — that dropdown only drives the "Apply to all Active staff" forms).
+// Newest year first; within a year, grouped by leave type and then by start date.
 function renderLocalLeaveHistory(){
-  const year = Number(document.getElementById('localLeaveYear').value || new Date().getFullYear());
   const types = ['Eid Al Fitr Leave','Eid Al Adha Leave','National Day','Foundation Day'];
-  const rows = leaveList.filter(l=> types.includes(l.type) && l.year===year).sort((a,b)=>a.type.localeCompare(b.type));
+  const rows = leaveList
+    .filter(l=> types.includes(l.type))
+    .sort((a,b)=> (Number(b.year)||0)-(Number(a.year)||0) || a.type.localeCompare(b.type) || new Date(a.fromDate)-new Date(b.fromDate));
   const tbody = document.getElementById('localLeaveHistoryTbody');
-  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet for this year</td></tr>'; return; }
+  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--slate); padding:24px;">Nothing applied yet</td></tr>'; return; }
   tbody.innerHTML = rows.map(l=>{
     // Was this local leave part of a bigger Annual Leave trip (i.e. the same submitted
     // request also contains an Annual Leave entry), or was it taken on its own locally?
