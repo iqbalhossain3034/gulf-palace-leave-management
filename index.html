@@ -4710,6 +4710,9 @@ function printLeaveRequestForm(){
     remark: row.querySelector('.mr-remark').value || '—'
   }));
 
+  const txt = id=> (document.getElementById(id)?.textContent||'').trim() || '—';
+  const overallDays = txt('lr_overallDaysText'), overallStart = txt('lr_overallStartText'), overallEnd = txt('lr_overallEndText');
+
   const html = `
     <div class="print-page">
       <div>
@@ -4730,6 +4733,9 @@ function printLeaveRequestForm(){
               <td style="padding:3px 10px 3px 24px; color:#5B6B7A; white-space:nowrap;">Leave Category</td><td style="padding:3px 0; font-weight:600;">${category}</td>
             </tr>
           </table>
+        </div>
+        <div style="margin:0 0 14px; padding:12px 16px; border:1px solid #ccc; background:#F7F3E8; font-size:14px; line-height:1.8;">
+          I wish to apply for <b>( ${overallDays} )</b> from <b>${overallStart}</b> to : <b>${overallEnd}</b> as detailed below :
         </div>
         <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
           <thead><tr style="background:#F0ECE1;">
